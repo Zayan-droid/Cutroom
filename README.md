@@ -88,9 +88,10 @@ src/
   engine/   Mock generation engine (Part A)
   store/    Zustand store & persistence (Part B)
   ui/       React components & motion (Part C)
+  story/    3-minute story agent — headless engine & timeline (Half 1)
   lib/      Shared helpers (cost, media, motion, cn)
   assets/   Bundled offline demo clips
-tests/      Engine, store, and integration tests
-Docs/       PRD, TRD, workstreams, Part C spec
+tests/      Engine, store, story, and integration tests
+Docs/       PRD, TRD, workstreams, Part C spec, story-agent spec
 design-system/  Cutroom design system notes
 ```

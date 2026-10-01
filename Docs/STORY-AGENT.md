@@ -94,6 +94,11 @@ export type LangCode = string;
 // Mouth shapes for the lip-sync avatar. A tiny, renderer-agnostic viseme set.
 export type Viseme = 'rest' | 'ah' | 'ee' | 'oh' | 'mbp' | 'fv';
 
+export type SceneTransition = 'cut' | 'fade' | 'slide';
+
+// Mirrors Take's lifecycle: queued → composing → ready/failed.
+export type StoryStatus = 'queued' | 'composing' | 'ready' | 'failed';
+
 export interface StoryScene {
   id: string;
   index: number;
@@ -101,12 +106,12 @@ export interface StoryScene {
   assetUrl?: string;       // optional bundled/uploaded still, overrides the seed
   startMs: number;
   durationMs: number;
-  transition: 'cut' | 'fade' | 'slide';
+  transition: SceneTransition;
 }
 
 export interface VisemeMark {
   viseme: Viseme;
-  atMs: number;            // offset from the cue's startMs
+  atMs: number;            // offset from the owning cue's startMs
 }
 
 export interface DialogueCue {
@@ -117,11 +122,12 @@ export interface DialogueCue {
   lang: LangCode;
   startMs: number;
   durationMs: number;      // estimated by the engine; refined at play time
-  visemes?: VisemeMark[];  // optional; Half 2 may derive these live from TTS
+  visemes: VisemeMark[];   // baseline estimate; Half 2 may refine from live TTS
 }
 
 export interface SubtitleCue {
   id: string;
+  cueId: string;           // the DialogueCue this captions
   startMs: number;
   endMs: number;
   text: string;            // selected language
@@ -132,13 +138,14 @@ export interface StoryTimeline {
   title: string;
   prompt: string;
   lang: LangCode;
+  status: StoryStatus;
+  progress: number;        // 0..1
   totalMs: number;         // target ~180_000 (3:00)
   scenes: StoryScene[];
   dialogue: DialogueCue[];
   subtitles: SubtitleCue[];
+  error?: string;          // present when status is 'failed'
 }
-
-export type StoryStatus = 'outlining' | 'composing' | 'ready' | 'failed';
 ```
 
 ### `src/story/contract.ts` — the engine seam
@@ -153,18 +160,20 @@ export interface StoryInput {
 }
 
 // Mirrors GenerationEngine: a synchronous skeleton for optimistic UI, then
-// asynchronous fill via onUpdate — same pattern as generateDraft/renderFinal.
-export type StoryUpdate = (timeline: StoryTimeline, status: string) => void;
+// asynchronous fill via onUpdate. Each call is an independent, immutable snapshot
+// of the whole timeline — same shape as EngineUpdate = (take: Take) => void.
+export type StoryUpdate = (timeline: StoryTimeline) => void;
 
 export interface StoryEngine {
   // Languages the engine has template packs + likely voices for.
   languages(): LangCode[];
 
-  // Cost-before-the-click, consistent with Cutroom's quote(). Free in the demo.
+  // Cost-before-the-click, consistent with Cutroom's quote(). Pure, synchronous,
+  // and scales with the target length (see cost.ts — CREDITS_PER_MINUTE).
   quote(input: StoryInput): number;
 
-  // Returns a skeleton timeline immediately (scenes + empty cues), then drives
-  // it to a fully-populated 'ready' (or 'failed') via onUpdate.
+  // Returns a 'queued' storyboard immediately (scenes laid out, script withheld),
+  // then drives it to a fully-populated 'ready' (or 'failed') via onUpdate.
   compose(input: StoryInput, onUpdate: StoryUpdate): StoryTimeline;
 }
 ```
@@ -188,20 +197,28 @@ store wiring that exposes story state to the UI.
 cost, sitting behind `StoryEngine` so a real model router could replace only this
 folder.
 
-**Files**
+**Files** *(✅ built — see [`src/story/README.md`](../src/story/README.md))*
 
 ```
 src/story/
-  storyEngine.ts     # implements StoryEngine.compose()/quote()/languages()
-  grammar.ts         # seeded prompt → beats → shot list → dialogue lines
-  localize.ts        # language packs; dialogue + subtitle text per LangCode
-  timing.ts          # distribute beats across ~180s; per-cue duration estimates
-  subtitles.ts       # build SubtitleCue[] (and a toVtt() serializer)
-  voices.ts          # map LangCode → preferred speechSynthesis voice name/hints
-  visemes.ts         # text → VisemeMark[] estimate (refined live in Half 2)
-  cost.ts            # quote(input) → credits, matching src/engine/cost.ts style
+  types.ts           # ✅ frozen data model (Step 0)
+  contract.ts        # ✅ frozen StoryEngine seam (Step 0)
+  storyEngine.ts     # ✅ StoryEngine + pure buildTimeline(); progressive reveal
+  grammar.ts         # ✅ seeded prompt → beats → narrator + character lines
+  localize.ts        # ✅ language packs (en/es/fr/de/pt); text per LangCode
+  timing.ts          # ✅ lay beats across ~180s; per-cue duration estimates
+  subtitles.ts       # ✅ build SubtitleCue[] + toVtt() serializer
+  voices.ts          # ✅ LangCode → preferred voices; pure selectVoice()
+  visemes.ts         # ✅ text → VisemeMark[] estimate (refined live in Half 2)
+  cost.ts            # ✅ quote(input) → credits, src/engine/cost.ts style
+  failure.ts         # ✅ seeded failure injection (~1/8)
+  random.ts          # ✅ seeded PRNG (self-contained)
+  clone.ts           # ✅ deep-copy snapshots for immutable onUpdate
 src/store/
-  storySlice.ts      # composeStory() action; optimistic insert; onUpdate settle
+  storyStore.ts      # ✅ composeStory() action; optimistic insert; onUpdate settle
+  useStoryStore.ts   # ✅ bound hook + imperative API for Half 2
+tests/
+  story.test.mjs     # ✅ 15 tests: determinism, timing, subtitles, i18n, lifecycle
 ```
 
 **Deliverables**
