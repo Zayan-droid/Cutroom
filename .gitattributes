@@ -1,0 +1,15 @@
+# Normalize line endings for everyone: LF in the repository, and LF in the
+# working tree on checkout (overrides a contributor's core.autocrlf=true).
+* text=auto eol=lf
+
+# Binary assets — never normalize line endings or diff as text.
+*.mp4  binary
+*.pdf  binary
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.webp binary
+*.ico  binary
+*.woff  binary
+*.woff2 binary
