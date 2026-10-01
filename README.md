@@ -53,8 +53,9 @@ credits and runs entirely against the bundled mock engine.
 
 ### Mock engine configuration (optional)
 
-Copy [`.env.example`](.env.example) to `.env.local` to control the demo engine's
-seed, outcome (random / success / failure), and timing. Restart Vite to apply.
+Add a `.env.local` to control the demo engine's seed, outcome, and timing —
+`VITE_MOCK_ENGINE_SEED`, `VITE_MOCK_ENGINE_OUTCOME` (`random` / `success` /
+`failure`), and `VITE_MOCK_ENGINE_TIME_SCALE`. Restart Vite to apply.
 
 ## Scripts
 
