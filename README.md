@@ -1,6 +1,11 @@
 # Cutroom
 
+[![CI](https://github.com/Zayan-droid/Cutroom/actions/workflows/ci.yml/badge.svg)](https://github.com/Zayan-droid/Cutroom/actions/workflows/ci.yml)
+[![Deploy](https://github.com/Zayan-droid/Cutroom/actions/workflows/deploy.yml/badge.svg)](https://github.com/Zayan-droid/Cutroom/actions/workflows/deploy.yml)
+
 > Generation as editing, not gambling.
+
+**Live demo:** https://zayan-droid.github.io/Cutroom/
 
 Cutroom is a demo UI for AI video generation that treats every generation as a
 **take** in an editable tree — not a one-shot slot-machine pull. You draft, pick,
@@ -63,10 +68,18 @@ seed, outcome (random / success / failure), and timing. Restart Vite to apply.
 | `npm run test:engine` | Engine tests only |
 | `npm run test:store` | Store tests only |
 
+## CI / CD
+
+Every push and pull request runs [CI](.github/workflows/ci.yml) — typecheck,
+tests, and build must all pass. Merges to `main` auto-deploy to GitHub Pages via
+[deploy.yml](.github/workflows/deploy.yml). Work happens on per-part feature
+branches; see [`CONTRIBUTING.md`](CONTRIBUTING.md) for the branch strategy.
+
 ## Tech stack
 
 React 18 · TypeScript · Vite · Tailwind CSS · Zustand · Framer Motion ·
-lucide-react. Tests run on the built-in `node --test` runner.
+lucide-react. Tests run on the built-in `node --test` runner (Node 24+, which
+strips TypeScript types so the `.test.mjs` files import `.ts` sources directly).
 
 ## Project layout
 
