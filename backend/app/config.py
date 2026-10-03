@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     # Server
     port: int = 8787
     allowed_origins: str = "http://localhost:5173"
+    # The backend's own public URL — used to build /asset/{key} links the browser
+    # can fetch. Set to the deployed backend URL in production.
+    public_base_url: str = "http://localhost:8787"
 
     # Text — Groq (model ids rotate; see GET /openai/v1/models for the live list)
     groq_api_key: str = ""

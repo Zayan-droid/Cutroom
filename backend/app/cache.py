@@ -2,11 +2,15 @@
 
 Every generated asset is keyed by a hash of its inputs, so repeat requests (and
 judges clicking around the live demo) are served from cache for free instead of
-re-billing the GPU provider. If R2 is not configured the store is a no-op and
-callers fall back to returning a data: URL.
+re-billing the GPU provider.
+
+The bucket stays PRIVATE: assets are served back to the browser through the
+backend's own `/asset/{key}` route (see main.py), so no public bucket, r2.dev
+subdomain, or custom domain is required. If R2 is not configured at all, callers
+fall back to returning a data: URL inline.
 """
 import hashlib
-from typing import Optional
+from typing import Optional, Tuple
 
 import boto3
 from botocore.config import Config
@@ -24,7 +28,6 @@ class AssetStore:
         s = get_settings()
         self.enabled = s.r2_ready
         self._bucket = s.r2_bucket
-        self._public = s.r2_public_url.rstrip("/")
         self._client = None
         if self.enabled:
             self._client = boto3.client(
@@ -36,12 +39,6 @@ class AssetStore:
                 region_name="auto",
             )
 
-    def url_for(self, key: str) -> Optional[str]:
-        """Public URL for a key, or None if no public base is configured."""
-        if not self.enabled or not self._public:
-            return None
-        return f"{self._public}/{key}"
-
     def exists(self, key: str) -> bool:
         if not self.enabled or self._client is None:
             return False
@@ -51,20 +48,26 @@ class AssetStore:
         except Exception:
             return False
 
-    def put(self, key: str, data: bytes, content_type: str) -> Optional[str]:
-        """Upload and return the public URL, or None to fall back to a data URL.
-
-        Caching is an optimization, never a hard dependency: any R2 error (missing
-        bucket, bad credentials, outage) degrades to None so the asset is still
-        returned inline instead of failing the request.
-        """
+    def put(self, key: str, data: bytes, content_type: str) -> bool:
+        """Upload an asset. Returns False (never raises) so a cache problem
+        degrades to an inline data URL instead of failing generation."""
         if not self.enabled or self._client is None:
-            return None
+            return False
         try:
             self._client.put_object(
                 Bucket=self._bucket, Key=key, Body=data, ContentType=content_type
             )
+            return True
         except Exception as exc:  # noqa: BLE001 - cache must never break generation
             print(f"[cache] R2 put failed ({key}): {exc} - serving inline instead")
+            return False
+
+    def get(self, key: str) -> Optional[Tuple[bytes, str]]:
+        """Fetch an asset's bytes + content type, or None if unavailable."""
+        if not self.enabled or self._client is None:
             return None
-        return self.url_for(key)
+        try:
+            obj = self._client.get_object(Bucket=self._bucket, Key=key)
+            return obj["Body"].read(), obj.get("ContentType", "application/octet-stream")
+        except Exception:
+            return None

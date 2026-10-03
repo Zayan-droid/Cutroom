@@ -15,7 +15,7 @@ import base64
 from contextlib import asynccontextmanager
 
 import httpx
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import schemas
@@ -47,6 +47,19 @@ def _data_url(data: bytes, content_type: str = "image/png") -> str:
     return f"data:{content_type};base64,{base64.b64encode(data).decode()}"
 
 
+def _asset_url(key: str) -> str:
+    """Browser-fetchable URL for a cached asset.
+
+    Prefers a real public base (custom domain / r2.dev) if configured; otherwise
+    serves the private object through this backend's /asset proxy.
+    """
+    s = get_settings()
+    pub = s.r2_public_url.rstrip("/")
+    if pub and "r2.cloudflarestorage.com" not in pub:
+        return f"{pub}/{key}"
+    return f"{s.public_base_url.rstrip('/')}/asset/{key}"
+
+
 @app.get("/health")
 def health() -> dict:
     s = get_settings()
@@ -73,9 +86,7 @@ async def post_image(req: schemas.ImageRequest) -> dict:
     key = cache_key("img", f"{model}|{req.prompt}|{req.width}x{req.height}|{req.seed}", "png")
 
     if store.exists(key):
-        cached = store.url_for(key)
-        if cached:
-            return {"url": cached}
+        return {"url": _asset_url(key)}
 
     try:
         data = await image_cf.generate_image(
@@ -84,7 +95,22 @@ async def post_image(req: schemas.ImageRequest) -> dict:
     except httpx.HTTPError as exc:
         raise HTTPException(502, f"Image generation failed: {exc}") from exc
 
-    return {"url": store.put(key, data, "image/png") or _data_url(data)}
+    return {"url": _asset_url(key) if store.put(key, data, "image/png") else _data_url(data)}
+
+
+@app.get("/asset/{key:path}")
+def get_asset(key: str) -> Response:
+    """Serve a cached asset from the private R2 bucket (CORS-enabled for canvas)."""
+    got: AssetStore = app.state.store
+    result = got.get(key)
+    if result is None:
+        raise HTTPException(404, "Asset not found.")
+    data, content_type = result
+    return Response(
+        content=data,
+        media_type=content_type,
+        headers={"Cache-Control": "public, max-age=31536000, immutable"},
+    )
 
 
 @app.post("/video", response_model=schemas.VideoJob)
