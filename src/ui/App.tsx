@@ -20,6 +20,7 @@ import {
 } from '@/store';
 import { toast } from '@/store/toast';
 import { quote } from '@/lib/cost';
+import { ConnectedStoryMode } from './story/ConnectedStoryMode';
 
 export function App() {
   const hasTakes = useHasTakes();
@@ -30,6 +31,7 @@ export function App() {
   const avail = useAvailableCredits();
 
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [mode, setMode] = useState<'takes' | 'story'>('takes');
   const [focusId, setFocusId] = useState<string | null>(activeId);
 
   // Follow programmatic active changes: render/nudge/retry focus the new take;
@@ -49,7 +51,8 @@ export function App() {
 
   const inFocus = focusId !== null && activeTake !== null;
 
-  const bindings = useMemo(() => {
+  const bindings = useMemo<Record<string, () => void>>(() => {
+    if (mode === 'story') return {} as Record<string, () => void>;
     const navigate = (delta: number) => {
       if (drafts.length === 0) return;
       const ids = drafts.map((d) => d.id);
@@ -82,16 +85,24 @@ export function App() {
       arrowright: () => navigate(1),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paletteOpen, inFocus, activeTake, avail, drafts, activeId]);
+  }, [mode, paletteOpen, inFocus, activeTake, avail, drafts, activeId]);
 
   useHotkeys(bindings);
 
   return (
     <MotionConfig reducedMotion="user">
       <div className="app-canvas min-h-full">
-        <TopBar onOpenPalette={() => setPaletteOpen(true)} />
+        <TopBar onOpenPalette={() => setPaletteOpen(true)} showActions={mode === 'takes'} />
+        <nav aria-label="Workspace mode" className="mx-auto flex max-w-[1400px] gap-1 px-4 pt-4">
+          {(['takes', 'story'] as const).map((item) => (
+            <button key={item} aria-pressed={mode === item} onClick={() => { setMode(item); setPaletteOpen(false); }}
+              className={`cursor-pointer rounded-xl px-4 py-2 text-sm font-medium transition-colors ${mode === item ? 'bg-white/10 text-fg' : 'text-fg-muted hover:bg-white/5 hover:text-fg'}`}>
+              {item === 'takes' ? 'Takes' : 'Story studio'}
+            </button>
+          ))}
+        </nav>
 
-        {!hasTakes ? (
+        {mode === 'story' ? <ConnectedStoryMode /> : !hasTakes ? (
           <LandScreen />
         ) : (
           <main className="mx-auto max-w-[1400px] px-4 py-5">
@@ -115,7 +126,7 @@ export function App() {
           </main>
         )}
 
-        <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+        <CommandPalette open={mode === 'takes' && paletteOpen} onClose={() => setPaletteOpen(false)} />
         <Toaster />
       </div>
     </MotionConfig>

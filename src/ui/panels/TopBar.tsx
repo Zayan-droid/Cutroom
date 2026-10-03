@@ -1,12 +1,15 @@
 import { motion } from 'framer-motion';
 import { Scissors, Coins, RotateCcw } from 'lucide-react';
-import { actions, useAvailableCredits, useCredits, useHasTakes } from '@/store';
+import { actions, useAvailableCredits, useCredits, useHasTakes, useStoryStore } from '@/store';
 import { Kbd } from '@/ui/components/ui';
 import { tBase } from '@/lib/motion';
 
-export function TopBar({ onOpenPalette }: { onOpenPalette: () => void }) {
-  const credits = useCredits();
-  const available = useAvailableCredits();
+export function TopBar({ onOpenPalette, showActions = true }: { onOpenPalette: () => void; showActions?: boolean }) {
+  const takeCredits = useCredits();
+  const takeAvailable = useAvailableCredits();
+  const storyCredits = useStoryStore((state) => state.credits);
+  const credits = showActions ? takeCredits : storyCredits;
+  const available = showActions ? takeAvailable : storyCredits;
   const reserved = credits - available;
   const hasTakes = useHasTakes();
 
@@ -22,7 +25,7 @@ export function TopBar({ onOpenPalette }: { onOpenPalette: () => void }) {
         </div>
 
         <div className="ml-auto flex items-center gap-2">
-          <button
+          {showActions && <button
             onClick={onOpenPalette}
             className="hidden cursor-pointer items-center gap-2 rounded-xl border border-border bg-white/[0.03] px-3 py-2 text-sm text-fg-muted transition-colors hover:border-border-strong hover:text-fg sm:flex"
           >
@@ -31,10 +34,10 @@ export function TopBar({ onOpenPalette }: { onOpenPalette: () => void }) {
               <Kbd>⌘</Kbd>
               <Kbd>K</Kbd>
             </span>
-          </button>
+          </button>}
 
           <div
-            title={reserved > 0 ? `${available} available · ${reserved} held for a render in progress` : `${available} credits available`}
+            title={reserved > 0 ? `${available} available · ${reserved} held for a render in progress` : `${available} ${showActions ? '' : 'story '}credits available`}
             className="flex items-center gap-2 rounded-xl border border-border bg-white/[0.03] px-3 py-2"
           >
             <Coins className="h-4 w-4 text-warning" aria-hidden />
@@ -46,11 +49,11 @@ export function TopBar({ onOpenPalette }: { onOpenPalette: () => void }) {
             >
               {available}
             </motion.span>
-            <span className="hidden text-xs text-fg-subtle sm:block">credits</span>
+            <span className="hidden text-xs text-fg-subtle sm:block">{showActions ? 'credits' : 'story credits'}</span>
             {reserved > 0 && <span className="h-1.5 w-1.5 rounded-full bg-warning animate-pulse-soft" aria-hidden />}
           </div>
 
-          {hasTakes && (
+          {showActions && hasTakes && (
             <button
               onClick={() => actions.reset()}
               title="Start a new session"

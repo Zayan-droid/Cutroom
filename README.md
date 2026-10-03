@@ -43,6 +43,11 @@ per-layer READMEs in [`src/engine/`](src/engine/README.md) and
 
 ## Getting started
 
+**Story studio** adds a three-minute story player with localized narration,
+an animated avatar, subtitles, scene navigation, and silent video / WebVTT
+downloads. It connects to the story engine through the store; see the
+[player notes](src/ui/story/README.md) for playback and export limits.
+
 ```bash
 npm install
 npm run dev

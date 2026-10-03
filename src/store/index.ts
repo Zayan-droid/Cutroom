@@ -10,6 +10,7 @@ import { useProjectStore } from './useProjectStore.ts';
 import type { Intent, Nudge } from '@/types';
 
 export { useProjectStore };
+export { useStoryStore } from './useStoryStore.ts';
 export {
   useActiveTake,
   useDrafts,
