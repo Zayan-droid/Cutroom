@@ -1,6 +1,12 @@
 import { useStore } from 'zustand';
 import { createStoryStore, type StoryStore } from './storyStore.ts';
-import { storyEngine as engine } from '../story/storyEngine.ts';
+import { storyEngine } from '../story/storyEngine.ts';
+import { remoteStoryEngine } from '../story/remoteStoryEngine.ts';
+import { remoteEnabled } from '../lib/apiClient.ts';
+
+// Real backend (local structure + generated scene images) when enabled;
+// otherwise the fully offline procedural story engine.
+const engine = remoteEnabled ? remoteStoryEngine : storyEngine;
 
 export const storyStore = createStoryStore(engine);
 

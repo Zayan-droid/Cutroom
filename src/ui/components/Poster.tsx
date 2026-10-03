@@ -15,10 +15,15 @@ interface PosterProps {
   badge?: boolean;
 }
 
-/** A real bundled clip from the engine (Part A), not a synthetic gradient marker. */
+/** A real asset from the engine (bundled clip, or a generated image/video URL). */
 function realAsset(take: Take): string | null {
   const url = take.assetUrl;
   return take.status === 'ready' && url && !url.startsWith('placeholder://') ? url : null;
+}
+
+/** Remote renders return video clips; remote drafts (and some stills) are images. */
+function isVideoAsset(url: string): boolean {
+  return /\.(mp4|webm|mov|m4v)(\?.*)?$/i.test(url) || url.startsWith('data:video') || url.startsWith('blob:');
 }
 
 export function Poster({
@@ -42,11 +47,17 @@ export function Poster({
   // network/codec error — drop back to the gradient, which restores the play
   // affordance and drift rather than leaving a broken/empty tile.
   const asset = realAsset(take);
+  const assetIsVideo = asset !== null && isVideoAsset(asset);
   const [videoBroke, setVideoBroke] = useState(false);
-  const showVideo = asset !== null && !reduce && !videoBroke;
+  const [imageBroke, setImageBroke] = useState(false);
+  const showVideo = asset !== null && assetIsVideo && !reduce && !videoBroke;
+  const showImage = asset !== null && !assetIsVideo && !imageBroke;
+  // Any real frame on screen suppresses the gradient fallback, drift, and badge.
+  const hasRealFrame = showVideo || showImage;
   const videoRef = useRef<HTMLVideoElement>(null);
   useEffect(() => {
     setVideoBroke(false);
+    setImageBroke(false);
     // React can drop the `muted` attribute; force it so inline autoplay is allowed.
     if (videoRef.current) videoRef.current.muted = true;
   }, [asset]);
@@ -81,8 +92,19 @@ export function Poster({
         />
       )}
 
-      {/* Slow "footage" drift — only on the gradient fallback (the clip already moves). */}
-      {ready && !showVideo && withDrift && !reduce && (
+      {showImage && asset && (
+        <img
+          key={asset}
+          src={asset}
+          alt=""
+          aria-hidden
+          onError={() => setImageBroke(true)}
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+      )}
+
+      {/* Slow "footage" drift — only on the gradient fallback (real frames don't need it). */}
+      {ready && !hasRealFrame && withDrift && !reduce && (
         <div
           className="absolute inset-[-12%] animate-drift"
           style={{
@@ -97,8 +119,8 @@ export function Poster({
         style={{ boxShadow: 'inset 0 0 90px 12px rgba(0,0,0,0.55)' }}
       />
 
-      {/* Play affordance only when not already playing a clip. */}
-      {ready && !showVideo && (
+      {/* Play affordance only on the gradient fallback (no real frame shown). */}
+      {ready && !hasRealFrame && (
         <div className="pointer-events-none absolute inset-0 grid place-items-center">
           <div className="grid h-12 w-12 place-items-center rounded-full bg-black/30 backdrop-blur-sm ring-1 ring-white/25">
             <Play className="h-5 w-5 translate-x-[1px] fill-white text-white" />
@@ -132,7 +154,7 @@ export function Poster({
 
       {failed && <div className="absolute inset-0 bg-[#1A0B12]/70" />}
 
-      {badge && ready && (
+      {badge && ready && !hasRealFrame && (
         <span className="absolute bottom-2 left-2 rounded bg-black/45 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-white/70 backdrop-blur-sm">
           Placeholder
         </span>

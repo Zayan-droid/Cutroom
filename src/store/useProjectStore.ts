@@ -1,7 +1,13 @@
 import { useStore } from 'zustand';
 import { createProjectStore, type ProjectStore } from './projectStore.ts';
 import { browserStorage } from './persist.ts';
-import { mockEngine as engine } from '../engine/mockEngine.ts';
+import { mockEngine } from '../engine/mockEngine.ts';
+import { remoteEngine } from '../engine/remoteEngine.ts';
+import { remoteEnabled } from '../lib/apiClient.ts';
+
+// Real backend when VITE_USE_REMOTE_ENGINE=true and VITE_API_BASE is set;
+// otherwise the bundled mock engine, which always works offline.
+const engine = remoteEnabled ? remoteEngine : mockEngine;
 
 export const projectStore = createProjectStore(engine, { storage: browserStorage() });
 
