@@ -52,10 +52,19 @@ class AssetStore:
             return False
 
     def put(self, key: str, data: bytes, content_type: str) -> Optional[str]:
-        """Upload and return the public URL (None if not publicly served)."""
+        """Upload and return the public URL, or None to fall back to a data URL.
+
+        Caching is an optimization, never a hard dependency: any R2 error (missing
+        bucket, bad credentials, outage) degrades to None so the asset is still
+        returned inline instead of failing the request.
+        """
         if not self.enabled or self._client is None:
             return None
-        self._client.put_object(
-            Bucket=self._bucket, Key=key, Body=data, ContentType=content_type
-        )
+        try:
+            self._client.put_object(
+                Bucket=self._bucket, Key=key, Body=data, ContentType=content_type
+            )
+        except Exception as exc:  # noqa: BLE001 - cache must never break generation
+            print(f"[cache] R2 put failed ({key}): {exc} - serving inline instead")
+            return None
         return self.url_for(key)

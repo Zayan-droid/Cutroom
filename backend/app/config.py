@@ -18,9 +18,9 @@ class Settings(BaseSettings):
     port: int = 8787
     allowed_origins: str = "http://localhost:5173"
 
-    # Text — Groq
+    # Text — Groq (model ids rotate; see GET /openai/v1/models for the live list)
     groq_api_key: str = ""
-    groq_model: str = "llama-3.3-70b-versatile"
+    groq_model: str = "openai/gpt-oss-120b"
 
     # Image — Cloudflare Workers AI
     cloudflare_account_id: str = ""

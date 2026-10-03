@@ -91,10 +91,38 @@ async function runImage(take: Take, onUpdate: EngineUpdate, seed: number): Promi
   }
 }
 
+/** Higher-res still used when no video provider/credit is available. */
+async function renderStillFallback(take: Take, onUpdate: EngineUpdate): Promise<void> {
+  try {
+    const base = sizeFor(take.intent.kind);
+    const { url } = await postImage({
+      prompt: promptFor(take.intent, 'render'),
+      width: base.width * 2,
+      height: base.height * 2,
+      seed: randomSeed(),
+    });
+    onUpdate({ ...copy(take), status: 'ready', progress: 1, assetUrl: url });
+  } catch (error) {
+    onUpdate({
+      ...copy(take),
+      status: 'failed',
+      progress: 1,
+      error: failMessage(error, 'Render failed. Try again.'),
+    });
+  }
+}
+
 async function runVideo(take: Take, onUpdate: EngineUpdate): Promise<void> {
   onUpdate({ ...copy(take), status: 'generating', progress: 0.1 });
+  let job;
   try {
-    const job = await postVideo({ prompt: promptFor(take.intent, 'render') });
+    job = await postVideo({ prompt: promptFor(take.intent, 'render') });
+  } catch {
+    // No video provider or no credit (e.g. fal balance exhausted) → still fallback.
+    await renderStillFallback(take, onUpdate);
+    return;
+  }
+  try {
     let progress = 0.15;
     for (let attempt = 0; attempt < 90; attempt++) {
       await new Promise((resolve) => setTimeout(resolve, 2500));
@@ -104,25 +132,15 @@ async function runVideo(take: Take, onUpdate: EngineUpdate): Promise<void> {
         return;
       }
       if (status.status === 'failed') {
-        onUpdate({
-          ...copy(take),
-          status: 'failed',
-          progress: 1,
-          error: status.error ?? 'Render failed. Try again.',
-        });
+        await renderStillFallback(take, onUpdate);
         return;
       }
       progress = Math.min(0.95, progress + 0.04);
       onUpdate({ ...copy(take), status: 'generating', progress });
     }
     onUpdate({ ...copy(take), status: 'failed', progress: 1, error: 'Render timed out.' });
-  } catch (error) {
-    onUpdate({
-      ...copy(take),
-      status: 'failed',
-      progress: 1,
-      error: failMessage(error, 'Render failed. Try again.'),
-    });
+  } catch {
+    await renderStillFallback(take, onUpdate);
   }
 }
 
