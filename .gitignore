@@ -1,3 +1,15 @@
 node_modules/
 dist/
 *.tsbuildinfo
+
+# Python (backend)
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Local env files hold real secrets — never commit them.
+# The tracked *.example templates are the only env files in git.
+.env
+.env.*
+!**/.env.example

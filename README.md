@@ -43,6 +43,11 @@ per-layer READMEs in [`src/engine/`](src/engine/README.md) and
 
 ## Getting started
 
+**Story studio** adds a three-minute story player with localized narration,
+an animated avatar, subtitles, scene navigation, and silent video / WebVTT
+downloads. It connects to the story engine through the store; see the
+[player notes](src/ui/story/README.md) for playback and export limits.
+
 ```bash
 npm install
 npm run dev
@@ -51,11 +56,17 @@ npm run dev
 Then open the Vite URL it prints. The app seeds a session with 120 simulated
 credits and runs entirely against the bundled mock engine.
 
-### Mock engine configuration (optional)
+### Engine configuration (optional)
 
 Add a `.env.local` to control the demo engine's seed, outcome, and timing —
 `VITE_MOCK_ENGINE_SEED`, `VITE_MOCK_ENGINE_OUTCOME` (`random` / `success` /
-`failure`), and `VITE_MOCK_ENGINE_TIME_SCALE`. Restart Vite to apply.
+`failure`), and `VITE_MOCK_ENGINE_TIME_SCALE`. The story engine takes the same
+three knobs under `VITE_STORY_ENGINE_*`. Restart Vite to apply.
+
+By default the app runs fully offline on the bundled mock engine. To point it at
+a real backend instead, set `VITE_USE_REMOTE_ENGINE=true` and `VITE_API_BASE` to
+the backend URL; leave it `false` for the mock engine, which always works. No
+API keys live in this frontend bundle — it ships to the browser.
 
 ## Scripts
 
@@ -78,9 +89,12 @@ branches; see [`CONTRIBUTING.md`](CONTRIBUTING.md) for the branch strategy.
 
 ## Tech stack
 
-React 18 · TypeScript · Vite · Tailwind CSS · Zustand · Framer Motion ·
-lucide-react. Tests run on the built-in `node --test` runner (Node 24+, which
-strips TypeScript types so the `.test.mjs` files import `.ts` sources directly).
+React 18 · TypeScript · Vite · Tailwind CSS · Zustand · Framer Motion. Type is
+Archivo (UI) and Newsreader (prompts and story text); icons are a small in-repo
+glyph set, and the visual rules live in
+[`design-system/cutroom/MASTER.md`](design-system/cutroom/MASTER.md). Tests run on
+the built-in `node --test` runner (Node 24+, which strips TypeScript types so the
+`.test.mjs` files import `.ts` sources directly).
 
 ## Project layout
 

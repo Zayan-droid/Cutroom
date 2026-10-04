@@ -1,139 +1,221 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type CSSProperties } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Clapperboard, Shuffle } from 'lucide-react';
-import { INTENT_LABELS, NUDGE_LABELS, type Nudge, type Take } from '@/types';
-import { Poster } from '@/ui/components/Poster';
-import { Button, CostChip, StatusPill } from '@/ui/components/ui';
+import { INTENT_LABELS, NUDGE_LABELS, type IntentKind, type Nudge, type Take } from '@/types';
+import { TakeFrame } from '@/ui/components/TakeFrame';
+import { DownloadTake } from '@/ui/components/DownloadTake';
+import { Button, ButtonCost, Status } from '@/ui/components/ui';
+import { Glyph } from '@/ui/components/Glyph';
 import { RecoverySurface } from './RecoverySurface';
 import { actions, useAvailableCredits } from '@/store';
 import { toast } from '@/store/toast';
 import { quote } from '@/lib/cost';
-import { fadeUp } from '@/lib/motion';
+import { isVideoAsset, ratioLabel } from '@/lib/media';
+import { takeAsset } from '@/lib/download';
+import { fadeUp, tBase } from '@/lib/motion';
 import { cn } from '@/lib/cn';
 
 const NUDGES = Object.keys(NUDGE_LABELS) as Nudge[];
 
-const MAXW: Record<Take['intent']['kind'], string> = {
-  social: 'max-w-[300px]',
-  ad: 'max-w-[420px]',
-  cinematic: 'max-w-[760px]',
+/**
+ * Frame size caps. The frame keeps its exact ratio; its height is budgeted
+ * against the viewport so the controls (and, for widescreen, the actions
+ * stacked below) stay on screen at common laptop heights.
+ */
+const FRAME_LIMIT: Record<IntentKind, { px: number; ratio: number; reserve: number }> = {
+  social: { px: 360, ratio: 9 / 16, reserve: 340 },
+  ad: { px: 460, ratio: 4 / 5, reserve: 340 },
+  cinematic: { px: 960, ratio: 16 / 9, reserve: 420 },
 };
+
+export function frameWidth({ px, ratio, reserve }: (typeof FRAME_LIMIT)[IntentKind]): string {
+  return `min(${px}px, calc(max(240px, 100vh - ${reserve}px) * ${ratio.toFixed(4)}))`;
+}
+
+/** The same caps for any shape (edited takes can be reframed to any of them). */
+export function frameLimitFor(aspect: number): (typeof FRAME_LIMIT)[IntentKind] {
+  if (aspect >= 1.2) return { ...FRAME_LIMIT.cinematic, ratio: aspect };
+  if (aspect >= 0.7) return { ...FRAME_LIMIT.ad, ratio: aspect };
+  return { ...FRAME_LIMIT.social, ratio: aspect };
+}
 
 export function Stage({
   take,
   onBack,
   showBack,
+  onEdit,
 }: {
   take: Take;
   onBack: () => void;
   showBack: boolean;
+  /** Open this take in the editor. */
+  onEdit?: (take: Take) => void;
 }) {
   const avail = useAvailableCredits();
   const ready = take.status === 'ready';
   const failed = take.status === 'failed';
-  const loading = take.status === 'queued' || take.status === 'generating';
   const isDraft = take.kind === 'draft';
   const renderCost = quote('render', take.intent.kind);
   const canRender = ready && isDraft && avail >= renderCost;
   const renderReady = take.kind === 'render' && ready;
+  const limit = FRAME_LIMIT[take.intent.kind];
+  const wide = take.intent.kind === 'cinematic';
+  const label = take.label ?? (isDraft ? 'Draft' : 'Render');
+  const asset = takeAsset(take);
+
+  const promptBlock = (
+    <div>
+      <p className="text-sm font-semibold text-ink">Prompt</p>
+      <p className="mt-1 max-w-3xl font-text text-[18px] leading-snug text-ink">{take.prompt}</p>
+    </div>
+  );
 
   // Micro-feedback: announce a successful render exactly once.
   const notified = useRef<string | null>(null);
   useEffect(() => {
     if (renderReady && notified.current !== take.id) {
       notified.current = take.id;
-      toast('Rendered — direction locked in.', 'success');
+      toast('Render finished. It is saved in your version history.', 'success');
     }
   }, [renderReady, take.id]);
 
   return (
-    <motion.div variants={fadeUp} initial="hidden" animate="show" exit="exit" className="flex flex-col gap-4">
-      <div className="flex items-center gap-3">
+    <motion.section variants={fadeUp} initial="hidden" animate="show" exit="exit" aria-labelledby="stage-title" className="flex flex-col gap-5">
+      <header className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-rule pb-3">
         {showBack && (
-          <Button variant="ghost" size="sm" onClick={onBack} leftIcon={<ArrowLeft className="h-4 w-4" />}>
-            Drafts
+          <Button variant="quiet" size="sm" onClick={onBack} leftIcon={<Glyph name="back" />} className="-ml-2">
+            All drafts
           </Button>
         )}
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-fg">{take.label ?? (isDraft ? 'Draft' : 'Render')}</span>
-          <span className="text-fg-subtle">·</span>
-          <StatusPill status={take.status} />
-        </div>
-        <span className="ml-auto rounded-full border border-border px-2.5 py-1 text-[11px] text-fg-muted">
-          {INTENT_LABELS[take.intent.kind]}
+        <h2 id="stage-title" className="text-xl font-bold tracking-tight">
+          {label}
+        </h2>
+        <Status status={take.status} progress={take.progress} />
+        <span className="ml-auto text-sm font-medium text-ink-2">
+          {INTENT_LABELS[take.intent.kind]} · {ratioLabel(take.intent.kind)}
         </span>
-      </div>
+      </header>
 
-      <div className={cn('mx-auto w-full', MAXW[take.intent.kind])}>
-        <motion.div
-          className={cn('rounded-2xl transition-shadow duration-500', renderReady && 'shadow-glow-success')}
-          animate={renderReady ? { scale: [1, 1.012, 1] } : undefined}
-          transition={{ duration: 0.6 }}
-        >
-          <Poster take={take} layoutId={`poster-${take.id}`} rounded="rounded-2xl" />
-        </motion.div>
-      </div>
-
-      <p className="mx-auto max-w-2xl text-center text-sm italic text-fg-muted line-clamp-2">“{take.prompt}”</p>
-
-      {failed ? (
-        <div className="mx-auto w-full max-w-xl">
-          <RecoverySurface take={take} />
+      {/* The picture leads. Widescreen takes span the column with actions below;
+          tall formats leave room beside the frame, so actions sit there instead —
+          the actions keep a minimum width and the frame gives way when space is short. */}
+      <div
+        className={cn(
+          'grid grid-cols-1 items-start gap-6',
+          !wide && 'md:grid-cols-[minmax(0,var(--frame-w))_minmax(17.5rem,1fr)] md:gap-8',
+        )}
+        style={{ '--frame-w': frameWidth(limit) } as CSSProperties}
+      >
+        <div className="mx-auto w-full max-w-[var(--frame-w)] md:mx-0">
+          <TakeFrame take={take} variant="stage" layoutId={`frame-${take.id}`} />
         </div>
-      ) : (
-        <div className="flex flex-col items-center gap-3">
-          <div className="flex flex-wrap items-center justify-center gap-2">
-            {isDraft && (
-              <Button
-                variant="primary"
-                size="lg"
-                disabled={!canRender || loading}
-                onClick={() => actions.render()}
-                leftIcon={<Clapperboard className="h-4 w-4" />}
-              >
-                Render
-                <CostChip cost={renderCost} className="ml-1" />
-              </Button>
-            )}
-            <Button
-              variant="subtle"
-              size="lg"
-              disabled={!ready}
-              onClick={() => {
-                actions.remix(take.id);
-                toast('Spun four variants.');
-              }}
-              leftIcon={<Shuffle className="h-4 w-4" />}
-            >
-              Remix
-            </Button>
-          </div>
 
-          {ready && (
-            <div className="flex flex-wrap items-center justify-center gap-2">
-              <span className="text-xs text-fg-subtle">Nudge:</span>
-              {NUDGES.map((n) => (
-                <button
-                  key={n}
-                  onClick={() => actions.applyNudge(take.id, n)}
-                  className="cursor-pointer rounded-full border border-border-strong bg-white/[0.04] px-3 py-1.5 text-xs font-medium text-fg-muted transition-colors hover:border-primary/40 hover:text-fg"
-                >
-                  {NUDGE_LABELS[n]}
-                </button>
-              ))}
+        <aside aria-label="Take actions" className={cn('grid grid-cols-1 content-start gap-6', wide && 'md:grid-cols-2 md:gap-x-8')}>
+          {/* Widescreen: the main actions come first, right under the player. */}
+          {!wide && promptBlock}
+
+          {failed ? (
+            <div>
+              <RecoverySurface take={take} />
             </div>
+          ) : (
+            <>
+              <div className={cn('flex flex-col gap-4', wide && 'md:col-span-2 md:flex-row md:flex-wrap md:items-start')}>
+                {renderReady && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0, transition: tBase }}
+                    className={cn('flex gap-2.5 rounded-md border border-ok/60 bg-ok/[0.08] p-3 text-[15px] text-ink', wide && 'md:basis-full')}
+                  >
+                    <Glyph name="check" className="mt-0.5 text-ok" />
+                    <p>
+                      <span className="font-semibold">Final render complete.</span>{' '}
+                      <span className="text-ink-2">Remix or adjust it to branch a new version.</span>
+                    </p>
+                  </motion.div>
+                )}
+
+                {isDraft && (
+                  <div className={cn('flex flex-col gap-2', wide && 'md:w-[22rem]')}>
+                    <Button variant="primary" size="lg" disabled={!canRender} onClick={() => actions.render()}>
+                      Render final
+                      <ButtonCost cost={renderCost} />
+                    </Button>
+                    {ready && !canRender ? (
+                      <p role="alert" className="text-sm text-bad">
+                        Not enough credits: this render needs {renderCost}, and {avail} {avail === 1 ? 'is' : 'are'} available.
+                      </p>
+                    ) : (
+                      <p className="text-sm text-ink-2">
+                        {ready ? 'Charged only when the render finishes.' : 'Available once this draft is ready.'}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {renderReady && (
+                  <DownloadTake
+                    take={take}
+                    label="Download final render"
+                    variant="primary"
+                    size="lg"
+                    className={cn(wide && 'md:w-[22rem]')}
+                  />
+                )}
+
+                <Button
+                  variant="secondary"
+                  size={wide ? 'lg' : 'md'}
+                  disabled={!ready}
+                  className={cn(wide && 'md:w-auto')}
+                  onClick={() => {
+                    actions.remix(take.id);
+                    toast('Remixing: four new drafts are on the way.');
+                  }}
+                >
+                  Remix into 4 drafts
+                  <ButtonCost cost={0} />
+                </Button>
+
+                {onEdit && asset && (
+                  <Button variant="secondary" size={wide ? 'lg' : 'md'} className={cn(wide && 'md:w-auto')} onClick={() => onEdit(take)}>
+                    {isVideoAsset(asset) ? 'Edit video' : 'Edit image'}
+                    <ButtonCost cost={0} />
+                  </Button>
+                )}
+
+                {isDraft && (
+                  <DownloadTake take={take} label="Download draft" variant="quiet" size={wide ? 'lg' : 'md'} className={cn(wide && 'md:w-auto')} />
+                )}
+              </div>
+            </>
           )}
 
-          {isDraft && ready && !canRender && (
-            <p className="text-xs text-danger">
-              Not enough credits — {avail} available, this render needs {renderCost}.
-            </p>
+          {wide && promptBlock}
+
+          {!failed && (
+            <fieldset disabled={!ready} className="flex min-w-0 flex-col gap-2 disabled:opacity-60">
+              <legend className="text-sm font-semibold text-ink">Adjust and retry</legend>
+              <p className="-mt-1 text-sm text-ink-2">Each adjustment makes one new free draft from this take.</p>
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-2">
+                {NUDGES.map((n) => (
+                  <Button
+                    key={n}
+                    size="sm"
+                    variant="secondary"
+                    className="border-edge font-medium"
+                    onClick={() => {
+                      actions.applyNudge(take.id, n);
+                      toast(`Adjusting: ${NUDGE_LABELS[n].toLowerCase()}.`);
+                    }}
+                  >
+                    {NUDGE_LABELS[n]}
+                  </Button>
+                ))}
+              </div>
+            </fieldset>
           )}
-          {renderReady && (
-            <p className="text-xs text-fg-subtle">Rendered. Remix or nudge to branch a new take — your rail keeps every version.</p>
-          )}
-        </div>
-      )}
-    </motion.div>
+        </aside>
+      </div>
+    </motion.section>
   );
 }

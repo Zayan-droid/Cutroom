@@ -1,67 +1,147 @@
-import { motion } from 'framer-motion';
-import { Scissors, Coins, RotateCcw } from 'lucide-react';
-import { actions, useAvailableCredits, useCredits, useHasTakes } from '@/store';
-import { Kbd } from '@/ui/components/ui';
-import { tBase } from '@/lib/motion';
+import { useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { actions, useAvailableCredits, useCredits, useProjectStore, useStoryStore } from '@/store';
+import { BrandMark } from '@/ui/components/Glyph';
+import { Button } from '@/ui/components/ui';
+import { ConfirmDialog } from '@/ui/components/ConfirmDialog';
+import { useTheme, type Theme } from '@/ui/hooks/useTheme';
+import { cn } from '@/lib/cn';
+import { tQuick } from '@/lib/motion';
 
-export function TopBar({ onOpenPalette }: { onOpenPalette: () => void }) {
-  const credits = useCredits();
-  const available = useAvailableCredits();
-  const reserved = credits - available;
-  const hasTakes = useHasTakes();
+export type Mode = 'takes' | 'edit' | 'story';
 
+// Short names below 1024px keep three tabs, the credits, and the theme switch on screen at 320px.
+const MODES: Array<{ id: Mode; label: string; short: string }> = [
+  { id: 'takes', label: 'Video takes', short: 'Takes' },
+  { id: 'edit', label: 'Edit video', short: 'Edit' },
+  { id: 'story', label: 'Story studio', short: 'Story' },
+];
+
+export function TopBar({ mode, onModeChange }: { mode: Mode; onModeChange: (mode: Mode) => void }) {
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-bg/70 backdrop-blur-xl">
-      <div className="mx-auto flex h-14 max-w-[1400px] items-center gap-3 px-4">
-        <div className="flex items-center gap-2.5">
-          <span className="grid h-8 w-8 place-items-center rounded-xl bg-gradient-to-br from-primary to-accent shadow-glow">
-            <Scissors className="h-4 w-4 text-white" aria-hidden />
-          </span>
-          <span className="text-[17px] font-bold tracking-tight text-fg">Cutroom</span>
-          <span className="hidden text-xs text-fg-subtle sm:block">generation as editing</span>
+    <header className="sticky top-0 z-40 border-b border-ink/80 bg-paper">
+      <div className="mx-auto flex max-w-[1400px] flex-wrap items-center gap-x-6 gap-y-1 px-4 sm:px-6">
+        <div className="flex h-14 items-center gap-2.5">
+          <BrandMark />
+          <span className="stretch-wide text-[19px] font-bold tracking-tight">Cutroom</span>
         </div>
 
-        <div className="ml-auto flex items-center gap-2">
-          <button
-            onClick={onOpenPalette}
-            className="hidden cursor-pointer items-center gap-2 rounded-xl border border-border bg-white/[0.03] px-3 py-2 text-sm text-fg-muted transition-colors hover:border-border-strong hover:text-fg sm:flex"
-          >
-            <span>Search actions</span>
-            <span className="flex items-center gap-1">
-              <Kbd>⌘</Kbd>
-              <Kbd>K</Kbd>
-            </span>
-          </button>
+        {/* On phones the workspace tabs drop to a second row, which also holds the theme switch. */}
+        <div className="order-last flex w-full items-center md:order-none md:w-auto">
+          <nav aria-label="Workspace" className="-mx-1 flex gap-1">
+            {MODES.map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                aria-current={mode === m.id ? 'page' : undefined}
+                aria-label={m.label}
+                onClick={() => onModeChange(m.id)}
+                className={cn(
+                  'tap relative h-11 px-2 text-[15px] font-semibold transition-colors md:h-14',
+                  mode === m.id ? 'text-ink' : 'text-ink-3 hover:text-ink',
+                )}
+              >
+                <span className="lg:hidden">{m.short}</span>
+                <span className="hidden lg:inline">{m.label}</span>
+                {mode === m.id && <span aria-hidden className="absolute inset-x-2 bottom-0 h-[3px] bg-ink" />}
+              </button>
+            ))}
+          </nav>
+          <ThemeSwitch className="ml-auto sm:hidden" />
+        </div>
 
-          <div
-            title={reserved > 0 ? `${available} available · ${reserved} held for a render in progress` : `${available} credits available`}
-            className="flex items-center gap-2 rounded-xl border border-border bg-white/[0.03] px-3 py-2"
-          >
-            <Coins className="h-4 w-4 text-warning" aria-hidden />
-            <motion.span
-              key={available}
-              initial={{ y: -6, opacity: 0 }}
-              animate={{ y: 0, opacity: 1, transition: tBase }}
-              className="tnum text-sm font-semibold text-fg"
-            >
-              {available}
-            </motion.span>
-            <span className="hidden text-xs text-fg-subtle sm:block">credits</span>
-            {reserved > 0 && <span className="h-1.5 w-1.5 rounded-full bg-warning animate-pulse-soft" aria-hidden />}
-          </div>
-
-          {hasTakes && (
-            <button
-              onClick={() => actions.reset()}
-              title="Start a new session"
-              aria-label="Start a new session"
-              className="grid h-10 w-10 cursor-pointer place-items-center rounded-xl border border-border bg-white/[0.03] text-fg-muted transition-colors hover:border-border-strong hover:text-fg"
-            >
-              <RotateCcw className="h-4 w-4" aria-hidden />
-            </button>
-          )}
+        <div className="ml-auto flex items-center gap-3 sm:gap-4">
+          <CreditReadout mode={mode} />
+          <ThemeSwitch className="hidden sm:flex" />
+          {mode === 'takes' && <NewSession />}
         </div>
       </div>
     </header>
+  );
+}
+
+function CreditReadout({ mode }: { mode: Mode }) {
+  const takeCredits = useCredits();
+  const takeAvailable = useAvailableCredits();
+  const storyCredits = useStoryStore((s) => s.credits);
+  // Edits are part of the takes project, so the edit tab shows the same balance.
+  const story = mode === 'story';
+  const available = story ? storyCredits : takeAvailable;
+  const held = story ? 0 : takeCredits - takeAvailable;
+
+  return (
+    <div className="flex items-baseline gap-1.5" aria-live="polite">
+      <span className="text-sm text-ink-2">{story ? 'Story credits' : 'Credits'}</span>
+      <span className="relative inline-block min-w-[2ch] overflow-hidden text-right">
+        <AnimatePresence initial={false} mode="popLayout">
+          <motion.span
+            key={available}
+            initial={{ y: -10, opacity: 0 }}
+            animate={{ y: 0, opacity: 1, transition: tQuick }}
+            exit={{ y: 10, opacity: 0, transition: tQuick }}
+            className="tnum inline-block text-lg font-bold"
+          >
+            {available}
+          </motion.span>
+        </AnimatePresence>
+      </span>
+      {held > 0 && (
+        <span className="tnum text-[13px] font-medium text-warn">
+          ({held} held<span className="hidden sm:inline"> for a render</span>)
+        </span>
+      )}
+    </div>
+  );
+}
+
+function ThemeSwitch({ className }: { className?: string }) {
+  const { theme, setTheme } = useTheme();
+  const options: Array<{ id: Theme; label: string }> = [
+    { id: 'light', label: 'Light' },
+    { id: 'dark', label: 'Dark' },
+  ];
+  return (
+    <div role="group" aria-label="Color theme" className={cn('flex rounded border border-edge', className)}>
+      {options.map((o) => (
+        <button
+          key={o.id}
+          type="button"
+          aria-pressed={theme === o.id}
+          onClick={() => setTheme(o.id)}
+          className={cn(
+            'h-8 px-2.5 text-[13px] font-semibold transition-colors first:rounded-l-sm last:rounded-r-sm',
+            theme === o.id ? 'bg-ink text-paper' : 'text-ink-2 hover:text-ink',
+          )}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function NewSession() {
+  const count = useProjectStore((s) => s.takes.length);
+  const [confirming, setConfirming] = useState(false);
+  if (count === 0) return null;
+  return (
+    <>
+      <Button size="sm" variant="secondary" onClick={() => setConfirming(true)}>
+        New session
+      </Button>
+      <ConfirmDialog
+        open={confirming}
+        title="Start a new session?"
+        confirmLabel={`Clear ${count} ${count === 1 ? 'take' : 'takes'}`}
+        onCancel={() => setConfirming(false)}
+        onConfirm={() => {
+          setConfirming(false);
+          actions.reset();
+        }}
+      >
+        This clears every take and its version history from this browser and resets the demo credit
+        balance. It can't be undone.
+      </ConfirmDialog>
+    </>
   );
 }

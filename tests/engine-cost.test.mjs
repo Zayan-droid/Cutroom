@@ -14,6 +14,12 @@ test('drafts are always free regardless of intent', () => {
   }
 });
 
+test('edits are free: they are made in the browser, not generated', () => {
+  for (const kind of ['social', 'ad', 'cinematic']) {
+    assert.equal(quote('edit', intent(kind)), 0);
+  }
+});
+
 test('renders are priced per intent kind', () => {
   assert.equal(quote('render', intent('social')), 4);
   assert.equal(quote('render', intent('ad')), 6);

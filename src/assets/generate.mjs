@@ -1,135 +1,139 @@
-// Regenerate the original offline mock clips with Node and ffmpeg on PATH.
-// Run from the repository root: node src/assets/generate.mjs
-import { mkdtempSync, writeFileSync, unlinkSync, rmdirSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join, dirname } from 'node:path';
+// Regenerate the offline sample clips with Node and ffmpeg on PATH.
+// Run from the repository root:
+//   node src/assets/generate.mjs                  all 24 clips, scenes rendered in parallel
+//   node src/assets/generate.mjs ad-3 social-1    only the named scenes (draft + render)
+//   node src/assets/generate.mjs --preview <dir>  one PNG still per scene, for review
+//
+// Every frame is original procedural imagery (no downloaded media, fonts, or
+// audio): raymarched landscapes and studio product shots, plus a few flat
+// scenes. All motion is periodic over the clip, so each 3-second clip loops.
+import { spawn } from 'node:child_process';
+import { once } from 'node:events';
+import { cpus } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { spawnSync } from 'node:child_process';
+import { mkdirSync } from 'node:fs';
+import { TAU, clamp } from './scenes/kit.mjs';
+import { dappled, grass, shoreline } from './scenes/flat.mjs';
+import { alpine, alpineLake, coast, dunes, highland } from './scenes/terrain.mjs';
+import { bottle, jar, mug, watch } from './scenes/studio.mjs';
 
-const output = dirname(fileURLToPath(import.meta.url));
-const scratch = mkdtempSync(join(tmpdir(), 'cutroom-clips-'));
-const palettes = [
-  [[22, 17, 57], [109, 59, 155], [255, 168, 104], [252, 225, 182]],
-  [[10, 38, 54], [21, 117, 127], [153, 231, 215], [240, 249, 219]],
-  [[55, 18, 41], [151, 48, 81], [248, 157, 134], [255, 228, 204]],
-  [[13, 27, 71], [70, 89, 188], [206, 180, 255], [235, 231, 255]],
-];
-const dimensions = {
-  social: { render: [720, 1280], draft: [180, 320] },
-  ad: { render: [864, 1080], draft: [256, 320] },
-  cinematic: { render: [1280, 720], draft: [320, 180] },
+const here = dirname(fileURLToPath(import.meta.url));
+const FPS = 24;
+const FRAMES = 72; // 3 s; every motion completes a whole cycle in this span
+// Drafts are the same footage at half resolution and half the frame rate.
+const SIZES = {
+  social: { render: [720, 1280], draft: [360, 640] },
+  ad: { render: [864, 1080], draft: [432, 540] },
+  cinematic: { render: [1280, 720], draft: [640, 360] },
 };
 
-const clamp = (value) => Math.min(1, Math.max(0, value));
-const blend = (a, b, amount) => a.map((v, i) => v + (b[i] - v) * clamp(amount));
-const mask = (distance, feather = 0.002) => clamp(0.5 - distance / feather);
-const roundedBox = (x, y, cx, cy, w, h, r) => {
-  const qx = Math.abs(x - cx) - w + r;
-  const qy = Math.abs(y - cy) - h + r;
-  return Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - r;
+// Index i is the file `<intent>-<i + 1>-{draft,render}.mp4`.
+const SCENES = {
+  social: [shoreline, dappled, alpineLake, grass],
+  ad: [mug, bottle, watch, jar],
+  cinematic: [highland, coast, dunes, alpine],
 };
 
-function scene(kind, variant, width, height) {
-  const [dark, mid, bright, light] = palettes[variant];
-  const data = Buffer.alloc(width * height * 3);
-  const ratio = width / height;
-  for (let row = 0; row < height; row++) {
-    for (let col = 0; col < width; col++) {
-      const u = col / width;
-      const v = row / height;
-      const x = (u - 0.5) * ratio;
-      const y = v - 0.5;
-      let color = blend(dark, mid, 0.16 + v * 0.48);
-      if (kind === 'social') {
-        const centerX = (variant % 2 ? -0.03 : 0.03);
-        const centerY = -0.09 + variant * 0.015;
-        const radius = Math.hypot(x - centerX, y - centerY);
-        color = blend(color, bright, Math.exp(-radius * radius * 14) * 0.37);
-        const wave = v - (0.75 + 0.09 * Math.sin(u * 5 + variant));
-        color = blend(color, dark, mask(-wave));
-        color = blend(color, bright, mask(Math.abs(wave) - 0.006) * 0.65);
-        const orbit = Math.hypot((x - centerX) * 0.82, (y - centerY) * 1.4);
-        color = blend(color, light, mask(Math.abs(orbit - 0.252) - 0.0015) * 0.65);
-        const body = mask(radius - 0.172);
-        const sphere = blend(mid, bright, clamp(0.55 - (x - centerX) * 2.4 - (y - centerY) * 2.0));
-        color = blend(color, sphere, body);
-        color = blend(color, light, Math.exp(-((x - centerX + 0.053) ** 2 + (y - centerY + 0.07) ** 2) * 450) * body * 0.72);
-        const dot = Math.hypot(x + 0.12, y - 0.21);
-        color = blend(color, bright, mask(dot - 0.028));
-      } else if (kind === 'ad') {
-        const halo = Math.hypot(x, y + 0.09);
-        color = blend(color, bright, Math.exp(-halo * halo * 11) * 0.32);
-        const haloEdge = mask(Math.abs(halo - 0.27) - 0.002);
-        color = blend(color, light, haloEdge * 0.24);
-        const pedestal = roundedBox(x, y, 0, 0.3, 0.25, 0.045, 0.018);
-        color = blend(color, blend(mid, bright, 0.4 - y), mask(pedestal));
-        const shadow = Math.exp(-x * x * 105 - (y - 0.249) ** 2 * 2300);
-        color = blend(color, dark, shadow * 0.6);
-        const bottle = roundedBox(x, y, 0, 0.015, 0.105, 0.217, 0.025);
-        const material = blend(mid, bright, 0.68 - x * 3 + Math.sin(x * 22) * 0.12);
-        color = blend(color, material, mask(bottle));
-        const cap = roundedBox(x, y, 0, -0.209, 0.07, 0.035, 0.008);
-        color = blend(color, blend(dark, mid, 0.8 - x * 3), mask(cap));
-        const label = roundedBox(x, y, 0, 0.035, 0.077, 0.079, 0.001);
-        color = blend(color, light, mask(label) * 0.9);
-        const mark = Math.abs(Math.hypot(x, y + 0.002) - 0.024);
-        color = blend(color, mid, mask(mark - 0.0015));
-        for (let line = 0; line < 3; line++) {
-          const lineWidth = line === 0 ? 0.038 : 0.027;
-          color = blend(color, mid, mask(roundedBox(x, y, 0, 0.046 + line * 0.008, lineWidth, 0.001, 0)) * 0.6);
-        }
-        color = blend(color, light, mask(roundedBox(x, y, -0.084, 0, 0.002, 0.17, 0.002)) * 0.33);
-      } else {
-        color = blend(dark, bright, clamp(v * 1.25) * 0.85);
-        const sunX = 0.18 - variant * 0.115;
-        const sunY = -0.11 + (variant % 2) * 0.04;
-        const sun = Math.hypot(x - sunX, y - sunY);
-        color = blend(color, light, Math.exp(-sun * sun * 14) * 0.42);
-        color = blend(color, light, mask(sun - 0.076));
-        for (let ridge = 0; ridge < 4; ridge++) {
-          const horizon = 0.45 + ridge * 0.12 + Math.sin(u * (7 + ridge * 1.8) + variant + ridge) * (0.08 - ridge * 0.013) + Math.sin(u * 20 + ridge) * 0.016;
-          const mountain = blend(dark, mid, 0.7 - ridge * 0.2);
-          color = blend(color, mountain, mask(horizon - v, 0.003));
-        }
-        const mist = Math.exp(-((v - 0.58) ** 2) * 220) * 0.13;
-        color = blend(color, light, mist);
-      }
-      const vignette = clamp(1 - (x * x + y * y) * 0.36);
-      const index = (row * width + col) * 3;
-      for (let c = 0; c < 3; c++) data[index + c] = Math.round(color[c] * vignette);
+// A static 4×4 ordered dither breaks up 8-bit banding without per-frame noise.
+const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((b) => (b + 0.5) / 16 - 0.5);
+
+function renderFrame(scene, w, h, frame, buffer) {
+  scene.frame(((frame % FRAMES) / FRAMES) * TAU);
+  let i = 0;
+  for (let row = 0; row < h; row++) {
+    const Y = (row + 0.5) / h;
+    for (let col = 0; col < w; col++) {
+      const c = scene.pixel((col + 0.5) / h, Y);
+      const d = BAYER[(row & 3) * 4 + (col & 3)];
+      buffer[i++] = clamp(Math.round(c[0] * 255 + d), 0, 255);
+      buffer[i++] = clamp(Math.round(c[1] * 255 + d), 0, 255);
+      buffer[i++] = clamp(Math.round(c[2] * 255 + d), 0, 255);
     }
   }
-  return Buffer.concat([Buffer.from(`P6\n${width} ${height}\n255\n`), data]);
+  return buffer;
 }
 
-function ffmpeg(args) {
-  const result = spawnSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', ...args], { encoding: 'utf8', windowsHide: true });
-  if (result.error) throw result.error;
-  if (result.status !== 0) throw new Error(result.stderr || `ffmpeg exited ${result.status}`);
+function run(args, input) {
+  const child = spawn('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', ...args], {
+    stdio: [input ? 'pipe' : 'ignore', 'ignore', 'pipe'],
+    windowsHide: true,
+  });
+  let stderr = '';
+  child.stderr.on('data', (chunk) => (stderr += chunk));
+  const done = new Promise((resolveDone, reject) => {
+    child.on('error', reject);
+    child.on('close', (code) => (code === 0 ? resolveDone() : reject(new Error(stderr || `ffmpeg exited ${code}`))));
+  });
+  return { child, done };
 }
 
-try {
-  for (const [kind, sizes] of Object.entries(dimensions)) {
-    for (let variant = 0; variant < 4; variant++) {
-      const [width, height] = sizes.render;
-      const still = join(scratch, `${kind}-${variant}.ppm`);
-      const render = join(output, `${kind}-${variant + 1}-render.mp4`);
-      const draft = join(output, `${kind}-${variant + 1}-draft.mp4`);
-      writeFileSync(still, scene(kind, variant, width, height));
-      try {
-        const phase = variant * Math.PI / 2;
-        const zoom = `1.045+0.012*sin(on/72*2*PI+${phase})`;
-        const panX = `iw/2-iw/zoom/2+iw*0.006*sin(on/72*2*PI+${phase})`;
-        const panY = `ih/2-ih/zoom/2+ih*0.006*cos(on/72*2*PI+${phase})`;
-        ffmpeg(['-i', still, '-vf', `zoompan=z='${zoom}':x='${panX}':y='${panY}':d=72:s=${width}x${height}:fps=24`, '-frames:v', '72', '-an', '-c:v', 'libx264', '-preset', 'fast', '-crf', '25', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', render]);
-        ffmpeg(['-i', render, '-vf', `scale=${sizes.draft[0]}:${sizes.draft[1]}:flags=lanczos,fps=12`, '-an', '-c:v', 'libx264', '-preset', 'fast', '-crf', '31', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', draft]);
-        console.log(`Generated ${kind} ${variant + 1} (draft + render)`);
-      } finally {
-        unlinkSync(still);
-      }
+async function renderClip(kind, variant) {
+  const [w, h] = SIZES[kind].render;
+  const [dw, dh] = SIZES[kind].draft;
+  const scene = SCENES[kind][variant](w, h);
+  const render = join(here, `${kind}-${variant + 1}-render.mp4`);
+  const draft = join(here, `${kind}-${variant + 1}-draft.mp4`);
+  const encoder = run([
+    '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', `${w}x${h}`, '-r', String(FPS), '-i', '-',
+    '-an', '-c:v', 'libx264', '-preset', 'slow', '-crf', '23', '-tune', 'film',
+    '-pix_fmt', 'yuv420p', '-movflags', '+faststart', render,
+  ], true);
+  const buffer = Buffer.alloc(w * h * 3);
+  for (let f = 0; f < FRAMES; f++) {
+    // Each frame gets its own copy: the pipe may still hold the previous one.
+    if (!encoder.child.stdin.write(Buffer.from(renderFrame(scene, w, h, f, buffer)))) await once(encoder.child.stdin, 'drain');
+  }
+  encoder.child.stdin.end();
+  await encoder.done;
+  await run([
+    '-i', render, '-vf', `scale=${dw}:${dh}:flags=lanczos,fps=12`,
+    '-an', '-c:v', 'libx264', '-preset', 'slow', '-crf', '27',
+    '-pix_fmt', 'yuv420p', '-movflags', '+faststart', draft,
+  ]).done;
+}
+
+async function preview(dir, frame) {
+  mkdirSync(dir, { recursive: true });
+  for (const [kind, scenes] of Object.entries(SCENES)) {
+    for (let variant = 0; variant < scenes.length; variant++) {
+      const [w, h] = SIZES[kind].render;
+      const pixels = renderFrame(scenes[variant](w, h), w, h, frame, Buffer.alloc(w * h * 3));
+      const png = join(dir, `${kind}-${variant + 1}.png`);
+      const job = run(['-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', `${w}x${h}`, '-i', '-', '-frames:v', '1', png], true);
+      job.child.stdin.end(pixels);
+      await job.done;
+      console.log(`Preview ${png}`);
     }
   }
-} finally {
-  // Only the unique temporary directory created by this process is removed.
-  rmdirSync(scratch);
+}
+
+// ── Command line ────────────────────────────────────────────────────────────
+
+const args = process.argv.slice(2);
+const all = Object.entries(SCENES).flatMap(([kind, list]) => list.map((_, v) => `${kind}-${v + 1}`));
+
+if (args[0] === '--preview') {
+  await preview(resolve(args[1] ?? 'clip-preview'), Number(args[2] ?? 0));
+} else if (args[0] === '--clip') {
+  // Worker mode: render one scene in this process.
+  const [kind, n] = args[1].split('-');
+  await renderClip(kind, Number(n) - 1);
+} else {
+  const wanted = args.length ? args : all;
+  for (const name of wanted) if (!all.includes(name)) throw new Error(`Unknown scene "${name}". Known: ${all.join(', ')}`);
+  const slots = Math.max(1, Math.min(wanted.length, cpus().length - 1));
+  const queue = [...wanted];
+  const started = Date.now();
+  const worker = async () => {
+    while (queue.length) {
+      const name = queue.shift();
+      const child = spawn(process.execPath, [fileURLToPath(import.meta.url), '--clip', name], { stdio: 'inherit', windowsHide: true });
+      const [code] = await once(child, 'close');
+      if (code !== 0) throw new Error(`Rendering ${name} failed (exit ${code}).`);
+      console.log(`Generated ${name} (draft + render)`);
+    }
+  };
+  await Promise.all(Array.from({ length: slots }, worker));
+  console.log(`Done in ${((Date.now() - started) / 1000).toFixed(1)} s.`);
 }

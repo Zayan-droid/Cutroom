@@ -1,47 +1,63 @@
 import { AnimatePresence, motion } from 'framer-motion';
-import { CornerDownRight, Film, Layers, GitBranch } from 'lucide-react';
 import { useRail, type RailEntry } from '@/store';
-import { StatusPill, CostChip } from '@/ui/components/ui';
-import { tBase, tFast } from '@/lib/motion';
+import { Cost, Status } from '@/ui/components/ui';
+import { summarizeRecipe } from '@/edit/recipe';
+import { slideIn } from '@/lib/motion';
 import { cn } from '@/lib/cn';
 
-function RailRow({ entry, onSelect }: { entry: RailEntry; onSelect: (id: string) => void }) {
-  const { take, depth, isActive, isAncestor } = entry;
-  const Icon = take.kind === 'render' ? Film : Layers;
+function Branch({ depth }: { depth: number }) {
+  if (depth === 0) return null;
   return (
-    <motion.button
-      layout
-      initial={{ opacity: 0, x: 10 }}
-      animate={{ opacity: 1, x: 0, transition: tBase }}
-      exit={{ opacity: 0, x: 6, transition: tFast }}
-      onClick={() => onSelect(take.id)}
-      style={{ paddingLeft: 8 + depth * 15 }}
-      className={cn(
-        'flex w-full cursor-pointer items-center gap-2 rounded-lg border py-2 pr-2 text-left transition-colors duration-200',
-        isActive
-          ? 'border-primary/50 bg-primary/10'
-          : isAncestor
-            ? 'border-transparent bg-white/[0.03] hover:bg-white/[0.06]'
-            : 'border-transparent hover:bg-white/[0.05]',
-      )}
-    >
-      {depth > 0 && <CornerDownRight className="h-3.5 w-3.5 shrink-0 text-fg-subtle" aria-hidden />}
-      <span
+    <span aria-hidden className="flex shrink-0 self-stretch" style={{ paddingLeft: (depth - 1) * 14 }}>
+      <span className="relative w-3.5">
+        <span className="absolute left-1 top-0 h-1/2 w-2.5 border-b border-l border-edge" />
+      </span>
+    </span>
+  );
+}
+
+function RailRow({ entry, index, onSelect }: { entry: RailEntry; index: number; onSelect: (id: string) => void }) {
+  const { take, depth, isActive, isAncestor } = entry;
+  const label = take.label ?? (take.kind === 'render' ? 'Render' : take.kind === 'edit' ? 'Edit' : 'Draft');
+  const kindWords = take.kind === 'render' ? 'final render' : take.kind === 'edit' ? 'edited version' : 'draft';
+  const summary = take.kind === 'edit' && take.edit ? summarizeRecipe(take.edit) : null;
+  return (
+    // No `layout` animation here: the panel is position: sticky, and layout
+    // measurements taken while the page is scrolled leave rows offset.
+    <motion.li variants={slideIn} initial="hidden" animate="show" exit="exit">
+      <button
+        type="button"
+        onClick={() => onSelect(take.id)}
+        aria-current={isActive ? 'true' : undefined}
+        aria-label={`${label}, ${kindWords}, ${summary ?? take.status}${isActive ? ', current' : ''}`}
         className={cn(
-          'grid h-7 w-7 shrink-0 place-items-center rounded-md',
-          isActive ? 'bg-primary/20 text-primary' : 'bg-white/[0.05] text-fg-muted',
+          'relative flex w-full items-stretch gap-2 py-2 pl-3 pr-3 text-left transition-colors duration-150',
+          isActive ? 'bg-mark/[0.08]' : 'hover:bg-ink/[0.04]',
         )}
       >
-        <Icon className="h-3.5 w-3.5" aria-hidden />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className={cn('block truncate text-[13px] font-medium', isActive ? 'text-fg' : 'text-fg-muted')}>
-          {take.label ?? (take.kind === 'render' ? 'Render' : 'Draft')}
+        {isActive && <span aria-hidden className="absolute inset-y-0 left-0 w-[3px] bg-mark" />}
+        <span className="tnum w-6 shrink-0 pt-px text-[13px] text-ink-3">{String(index + 1).padStart(2, '0')}</span>
+        <Branch depth={depth} />
+        <span className="min-w-0 flex-1">
+          <span
+            className={cn(
+              'block truncate text-[15px]',
+              isActive ? 'font-semibold text-ink' : isAncestor ? 'font-medium text-ink' : 'text-ink-2',
+            )}
+          >
+            {label}
+            {take.kind === 'render' && <span className="font-normal text-ink-3"> · final</span>}
+            {take.kind === 'edit' && <span className="font-normal text-ink-3"> · edited</span>}
+          </span>
+          {summary ? (
+            <span className="block truncate text-[13px] font-medium text-ink-2">{summary}</span>
+          ) : (
+            <Status status={take.status} progress={take.progress} />
+          )}
         </span>
-        <StatusPill status={take.status} />
-      </span>
-      {take.kind === 'render' && take.cost > 0 && <CostChip cost={take.cost} />}
-    </motion.button>
+        {take.kind === 'render' && take.cost > 0 && <Cost cost={take.cost} className="shrink-0 pt-px text-[13px] text-ink-2" />}
+      </button>
+    </motion.li>
   );
 }
 
@@ -49,32 +65,32 @@ export function VersionRail({ onSelect }: { onSelect: (id: string) => void }) {
   const rail = useRail();
 
   return (
-    <motion.aside
-      initial={{ opacity: 0, x: 16 }}
-      animate={{ opacity: 1, x: 0, transition: tBase }}
-      className="flex flex-col rounded-2xl border border-border bg-surface/50 backdrop-blur-md lg:h-[calc(100vh-140px)] lg:sticky lg:top-[100px]"
+    <aside
+      aria-labelledby="history-title"
+      className="flex flex-col rounded-md border border-rule bg-sheet lg:sticky lg:top-[72px] lg:max-h-[calc(100vh-96px)] lg:self-start"
     >
-      <header className="flex items-center gap-2 border-b border-border px-4 py-3">
-        <GitBranch className="h-4 w-4 text-fg-muted" aria-hidden />
-        <h2 className="text-sm font-semibold text-fg">Version rail</h2>
-        <span className="ml-auto tnum rounded-full bg-white/[0.06] px-2 py-0.5 text-[11px] text-fg-muted">
-          {rail.length}
+      <header className="flex items-baseline justify-between gap-2 border-b border-rule px-4 py-3">
+        <h2 id="history-title" className="text-base font-bold">
+          Version history
+        </h2>
+        <span className="tnum text-sm text-ink-2">
+          {rail.length} {rail.length === 1 ? 'take' : 'takes'}
         </span>
       </header>
 
-      <div className="thin-scroll flex max-h-64 flex-col gap-1 overflow-y-auto p-2 lg:max-h-none lg:flex-1">
+      <ol className="scroll-quiet max-h-72 divide-y divide-rule/70 overflow-y-auto overflow-x-hidden lg:max-h-none lg:flex-1">
         <AnimatePresence initial={false}>
-          {rail.map((entry) => (
-            <RailRow key={entry.take.id} entry={entry} onSelect={onSelect} />
+          {rail.map((entry, i) => (
+            <RailRow key={entry.take.id} entry={entry} index={i} onSelect={onSelect} />
           ))}
         </AnimatePresence>
-      </div>
+      </ol>
 
-      <footer className="border-t border-border px-4 py-2.5">
-        <p className="text-[11px] leading-relaxed text-fg-subtle">
-          Every take is kept. Branch from any good state — you never lose your way back.
+      <footer className="border-t border-rule px-4 py-3">
+        <p className="text-[13px] leading-snug text-ink-2">
+          Nothing is deleted. Select any take to continue from it. Indented takes branched from the take they sit under.
         </p>
       </footer>
-    </motion.aside>
+    </aside>
   );
 }

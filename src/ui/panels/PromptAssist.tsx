@@ -1,7 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion';
-import { Wand2 } from 'lucide-react';
-import { tBase, tFast } from '@/lib/motion';
-import { cn } from '@/lib/cn';
+import { tBase, tQuick } from '@/lib/motion';
 
 export interface AssistFields {
   subject: string;
@@ -10,80 +8,49 @@ export interface AssistFields {
   mood: string;
 }
 
-const FIELDS: Array<{ key: keyof AssistFields; label: string; placeholder: string }> = [
-  { key: 'subject', label: 'Subject', placeholder: 'A lone astronaut' },
-  { key: 'style', label: 'Style', placeholder: 'Anamorphic, 35mm film' },
-  { key: 'motion', label: 'Motion', placeholder: 'Slow dolly-in' },
-  { key: 'mood', label: 'Mood', placeholder: 'Awe, quiet tension' },
+const FIELDS: Array<{ key: keyof AssistFields; label: string; hint: string; placeholder: string }> = [
+  { key: 'subject', label: 'Subject', hint: 'Who or what is on screen', placeholder: 'A lone astronaut' },
+  { key: 'style', label: 'Look', hint: 'Lens, film, lighting', placeholder: 'Anamorphic, 35mm, cold light' },
+  { key: 'motion', label: 'Camera', hint: 'How the shot moves', placeholder: 'Slow dolly-in' },
+  { key: 'mood', label: 'Mood', hint: 'How it should feel', placeholder: 'Quiet, uneasy' },
 ];
 
-function Field({
-  label,
-  value,
-  placeholder,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  placeholder: string;
-  onChange: (v: string) => void;
-}) {
-  return (
-    <label className="flex flex-col gap-1.5">
-      <span className="text-[11px] font-medium uppercase tracking-wider text-fg-subtle">{label}</span>
-      <input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className={cn(
-          'h-10 rounded-lg border border-border bg-black/25 px-3 text-sm text-fg placeholder:text-fg-subtle/70',
-          'transition-colors duration-200 focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/40',
-        )}
-      />
-    </label>
-  );
-}
-
+/** Optional structured direction. Each field feeds one part of the intent. */
 export function PromptAssist({
+  id,
   open,
   fields,
   set,
-  onSurprise,
 }: {
+  id: string;
   open: boolean;
   fields: AssistFields;
   set: (key: keyof AssistFields, value: string) => void;
-  onSurprise: () => void;
 }) {
   return (
     <AnimatePresence initial={false}>
       {open && (
         <motion.div
+          id={id}
           key="assist"
-          initial={{ height: 0, opacity: 0 }}
-          animate={{ height: 'auto', opacity: 1, transition: tBase }}
-          exit={{ height: 0, opacity: 0, transition: tFast }}
-          className="overflow-hidden"
+          initial={{ opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0, transition: tBase }}
+          exit={{ opacity: 0, transition: tQuick }}
+          className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2"
         >
-          <div className="grid grid-cols-1 gap-3 pt-3 sm:grid-cols-2">
-            {FIELDS.map((f) => (
-              <Field
-                key={f.key}
-                label={f.label}
-                placeholder={f.placeholder}
+          {FIELDS.map((f) => (
+            <label key={f.key} className="flex min-w-0 flex-col gap-1">
+              <span className="text-sm font-semibold text-ink">
+                {f.label} <span className="font-normal text-ink-3">· {f.hint}</span>
+              </span>
+              <input
                 value={fields[f.key]}
-                onChange={(v) => set(f.key, v)}
+                onChange={(e) => set(f.key, e.target.value)}
+                placeholder={f.placeholder}
+                className="h-11 min-w-0 rounded border border-edge bg-field px-3 text-base text-ink placeholder:text-ink-3/80 transition-colors focus:border-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-ink"
               />
-            ))}
-          </div>
-          <button
-            type="button"
-            onClick={onSurprise}
-            className="mt-3 inline-flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm font-medium text-primary transition-colors hover:bg-primary/10"
-          >
-            <Wand2 className="h-4 w-4" aria-hidden />
-            Surprise me
-          </button>
+            </label>
+          ))}
         </motion.div>
       )}
     </AnimatePresence>

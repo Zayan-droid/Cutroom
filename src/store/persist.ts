@@ -1,5 +1,6 @@
 import type { Intent, Take } from '../types.ts';
 import type { StoreState } from './contract.ts';
+import { normalizeRecipe } from '../edit/recipe.ts';
 
 export const SESSION_KEY = 'cutroom.project.v1';
 export type SessionStorage = Pick<Storage, 'getItem' | 'setItem'>;
@@ -18,7 +19,9 @@ function isIntent(value: unknown): value is Intent {
 function isTake(value: unknown): value is Take {
   return record(value) && typeof value.id === 'string' && value.id.length > 0 &&
     (value.parentId === null || typeof value.parentId === 'string') &&
-    ['draft', 'render'].includes(String(value.kind)) && ['queued', 'generating', 'ready', 'failed'].includes(String(value.status)) &&
+    ['draft', 'render', 'edit'].includes(String(value.kind)) && ['queued', 'generating', 'ready', 'failed'].includes(String(value.status)) &&
+    // Edits are made ready and carry a readable recipe; generated takes carry none.
+    (value.kind === 'edit' ? value.status === 'ready' && normalizeRecipe(value.edit) !== null : value.edit === undefined) &&
     typeof value.prompt === 'string' && isIntent(value.intent) && finite(value.cost) && finite(value.createdAt) &&
     (value.progress === undefined || (finite(value.progress) && value.progress <= 1)) &&
     ['assetUrl', 'error', 'label'].every((key) => value[key] === undefined || typeof value[key] === 'string');
@@ -52,7 +55,7 @@ export function readSession(storage?: SessionStorage): StoreState | undefined {
       // Timers cannot survive a refresh. Preserve ancestry and offer a free retry.
       takes: takes.map((take) => take.status === 'queued' || take.status === 'generating'
         ? { ...take, status: 'failed', assetUrl: undefined, error: 'Generation was interrupted by a refresh. Reroll for free.' }
-        : take),
+        : take.kind === 'edit' ? { ...take, edit: normalizeRecipe(take.edit)! } : take),
     };
   } catch { return undefined; }
 }

@@ -7,9 +7,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useProjectStore } from './useProjectStore.ts';
-import type { Intent, Nudge } from '@/types';
+import type { EditRecipe, Intent, Nudge } from '@/types';
 
 export { useProjectStore };
+export { useStoryStore } from './useStoryStore.ts';
 export {
   useActiveTake,
   useDrafts,
@@ -33,5 +34,6 @@ export const actions = {
   remix: (id: string) => useProjectStore.getState().remix(id),
   retry: (id: string) => useProjectStore.getState().retry(id),
   applyNudge: (id: string, nudge: Nudge) => useProjectStore.getState().applyNudge(id, nudge),
+  applyEdit: (id: string, recipe: EditRecipe) => useProjectStore.getState().applyEdit(id, recipe),
   reset: () => useProjectStore.getState().reset(),
 };

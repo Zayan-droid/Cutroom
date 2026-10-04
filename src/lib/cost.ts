@@ -11,10 +11,10 @@ const RENDER_COST: Record<IntentKind, number> = {
 };
 
 export function quote(kind: TakeKind, intent: IntentKind): number {
-  return kind === 'draft' ? 0 : RENDER_COST[intent];
+  return kind === 'render' ? RENDER_COST[intent] : 0;
 }
 
-/** Human string for a cost chip. */
+/** Human string for a price, spelled out so it reads on its own. */
 export function costLabel(cost: number): string {
-  return cost === 0 ? 'Free' : `${cost} cr`;
+  return cost === 0 ? 'Free' : `${cost} ${cost === 1 ? 'credit' : 'credits'}`;
 }

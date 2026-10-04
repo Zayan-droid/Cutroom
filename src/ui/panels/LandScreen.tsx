@@ -1,58 +1,101 @@
+import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Sparkles, Clapperboard, GitBranch, type LucideIcon } from 'lucide-react';
 import { PromptForm } from './PromptForm';
-import { fadeUp, gridContainer, gridItem } from '@/lib/motion';
+import { TakeFrame } from '@/ui/components/TakeFrame';
+import { fadeUp } from '@/lib/motion';
+import { costLabel, quote } from '@/lib/cost';
+import { ratioLabel } from '@/lib/media';
+import { INTENT_LABELS, type IntentKind, type Take } from '@/types';
 
-const STEPS: Array<{ Icon: LucideIcon; title: string; text: string }> = [
-  { Icon: Sparkles, title: 'Draft', text: 'Four cheap previews, free. See the look before you spend a credit.' },
-  { Icon: Clapperboard, title: 'Render', text: 'Commit the one you like — the only step that costs credits.' },
-  { Icon: GitBranch, title: 'Branch', text: 'Remix, nudge, or reroll. Every take stays on the rail.' },
+// Bundled demo clips — the same full-resolution renders the offline engine plays back.
+const SAMPLES: Record<IntentKind, { url: string; scene: string }> = {
+  social: { url: new URL('../../assets/social-3-render.mp4', import.meta.url).href, scene: 'Alpine lake' },
+  ad: { url: new URL('../../assets/ad-2-render.mp4', import.meta.url).href, scene: 'Amber dropper bottle' },
+  cinematic: { url: new URL('../../assets/cinematic-2-render.mp4', import.meta.url).href, scene: 'Coastline' },
+};
+
+/** Max preview height per format, so a vertical sample never towers over the form. */
+const SAMPLE_WIDTH: Record<IntentKind, string> = {
+  social: 'max-w-[236px]',
+  ad: 'max-w-[336px]',
+  cinematic: 'max-w-none',
+};
+
+function sampleTake(kind: IntentKind): Take {
+  return {
+    id: `sample-${kind}`,
+    parentId: null,
+    kind: 'render',
+    status: 'ready',
+    prompt: SAMPLES[kind].scene,
+    intent: { kind, subject: '', style: '', motion: '', mood: '' },
+    assetUrl: SAMPLES[kind].url,
+    cost: 0,
+    createdAt: 0,
+  };
+}
+
+const STEPS: Array<{ term: string; text: (k: IntentKind) => string }> = [
+  { term: 'Drafts', text: () => 'Four at a time, always free. Compare directions before spending anything.' },
+  {
+    term: 'Render',
+    text: (k) =>
+      `${costLabel(quote('render', k))} for ${INTENT_LABELS[k].toLowerCase()}. Charged only when the render finishes.`,
+  },
+  { term: 'Versions', text: () => 'Drafts, renders, remixes, and retries all stay in your history. Continue from any of them.' },
 ];
 
 export function LandScreen() {
+  const [kind, setKind] = useState<IntentKind>('cinematic');
+  const sample = useMemo(() => sampleTake(kind), [kind]);
+
   return (
-    <div className="mx-auto flex min-h-[calc(100vh-56px)] w-full max-w-3xl flex-col items-center justify-center px-4 py-10">
-      <motion.div variants={fadeUp} initial="hidden" animate="show" className="mb-7 text-center">
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-white/[0.03] px-3 py-1 text-xs font-medium text-fg-muted">
-          <Sparkles className="h-3.5 w-3.5 text-primary" aria-hidden />
-          Generation, reframed as editing
-        </span>
-        <h1 className="mt-4 text-balance text-3xl font-bold leading-tight tracking-tight text-fg sm:text-[40px]">
-          Steer it. Preview it.{' '}
-          <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-            Commit once.
+    <main className="mx-auto max-w-[1400px] px-4 pb-16 pt-6 sm:px-6 sm:pt-8 lg:pt-12">
+      <motion.header variants={fadeUp} initial="hidden" animate="show" className="max-w-3xl">
+        <h1 className="stretch-wide text-[32px] font-bold leading-tight tracking-tight sm:text-[40px]">Start a video</h1>
+        <p className="mt-2 text-lg leading-relaxed text-ink-2">
+          <span className="sm:hidden">Four free drafts first. Pay only for the one you render.</span>
+          <span className="hidden sm:inline">
+            Describe a shot and Cutroom generates four drafts for free. Render the one you want — the only
+            step that costs credits — and keep branching from any version.
           </span>
-        </h1>
-        <p className="mx-auto mt-3 max-w-xl text-[15px] leading-relaxed text-fg-muted">
-          Describe what you want. Cutroom drafts four cheap takes, you pick a direction, and only the
-          final render spends credits. Never gamble in the dark.
         </p>
-      </motion.div>
+      </motion.header>
 
-      <motion.div variants={fadeUp} initial="hidden" animate="show" className="w-full">
-        <PromptForm variant="hero" />
-      </motion.div>
+      <div className="mt-6 grid grid-cols-1 items-start gap-8 sm:mt-8 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-10">
+        <motion.section
+          variants={fadeUp}
+          initial="hidden"
+          animate="show"
+          aria-label="New shot"
+          className="rounded-md border border-rule bg-sheet p-5 sm:p-7"
+        >
+          <PromptForm variant="hero" kind={kind} onKindChange={setKind} />
+        </motion.section>
 
-      <motion.div
-        variants={gridContainer}
-        initial="hidden"
-        animate="show"
-        className="mt-8 grid w-full grid-cols-1 gap-3 sm:grid-cols-3"
-      >
-        {STEPS.map(({ Icon, title, text }) => (
-          <motion.div
-            key={title}
-            variants={gridItem}
-            className="rounded-2xl border border-border bg-surface/40 p-4"
-          >
-            <span className="grid h-9 w-9 place-items-center rounded-xl bg-white/[0.05] text-primary">
-              <Icon className="h-4 w-4" aria-hidden />
-            </span>
-            <h3 className="mt-3 text-sm font-semibold text-fg">{title}</h3>
-            <p className="mt-1 text-[13px] leading-relaxed text-fg-subtle">{text}</p>
-          </motion.div>
-        ))}
-      </motion.div>
-    </div>
+        <motion.aside variants={fadeUp} initial="hidden" animate="show" aria-labelledby="sample-title" className="flex flex-col gap-6">
+          <figure className="flex flex-col gap-2">
+            <figcaption className="flex flex-wrap items-baseline justify-between gap-x-3">
+              <span id="sample-title" className="text-sm font-semibold text-ink">
+                Sample render · {SAMPLES[kind].scene}, {ratioLabel(kind)}
+              </span>
+              <span className="text-[13px] text-ink-3">Demo footage bundled with Cutroom, not your prompt</span>
+            </figcaption>
+            <div className={SAMPLE_WIDTH[kind]}>
+              <TakeFrame take={sample} variant="stage" />
+            </div>
+          </figure>
+
+          <dl className="divide-y divide-rule border-y border-rule">
+            {STEPS.map((s) => (
+              <div key={s.term} className="grid grid-cols-[6.5rem_minmax(0,1fr)] gap-3 py-3">
+                <dt className="text-[15px] font-semibold text-ink">{s.term}</dt>
+                <dd className="text-[15px] leading-snug text-ink-2">{s.text(kind)}</dd>
+              </div>
+            ))}
+          </dl>
+        </motion.aside>
+      </div>
+    </main>
   );
 }

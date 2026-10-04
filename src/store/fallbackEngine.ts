@@ -1,12 +1,12 @@
 // Temporary Part-B dependency until Part A provides mockEngine.ts.
 // Implements the frozen engine seam; contains no state-store or UI imports.
 import type { EngineUpdate, GenerationEngine } from '../engine/contract.ts';
-import type { Intent, Nudge, Take, TakeKind } from '../types.ts';
+import type { GenerationKind, Intent, Nudge, Take } from '../types.ts';
 
 let sequence = 0;
-const quote: GenerationEngine['quote'] = (kind, intent) => kind === 'draft' ? 0 : { social: 4, ad: 6, cinematic: 8 }[intent.kind];
+const quote: GenerationEngine['quote'] = (kind, intent) => kind === 'render' ? { social: 4, ad: 6, cinematic: 8 }[intent.kind] : 0;
 
-function enqueue(prompt: string, intent: Intent, parentId: string | null, kind: TakeKind, label: string, update: EngineUpdate, free = false): Take {
+function enqueue(prompt: string, intent: Intent, parentId: string | null, kind: GenerationKind, label: string, update: EngineUpdate, free = false): Take {
   const take: Take = {
     id: `take-${Date.now().toString(36)}-${++sequence}`, prompt, intent: { ...intent },
     parentId, kind, label, status: 'queued', createdAt: Date.now(), cost: free ? 0 : quote(kind, intent), progress: 0,
@@ -35,6 +35,6 @@ export const fallbackEngine: GenerationEngine = {
   generateDraft: ({ prompt, intent, parentId }, update) => batch(prompt, intent, parentId, 'Draft', update),
   renderFinal: ({ source }, update) => enqueue(source.prompt, source.intent, source.id, 'render', 'Render', update),
   remix: ({ source }, update) => batch(source.prompt, source.intent, source.id, 'Variant', update),
-  retry: ({ failed }, update) => enqueue(failed.prompt, failed.intent, failed.id, failed.kind, 'Reroll', update, true),
+  retry: ({ failed }, update) => enqueue(failed.prompt, failed.intent, failed.id, failed.kind === 'edit' ? 'draft' : failed.kind, 'Reroll', update, true),
   nudge: ({ source, nudge }, update) => enqueue(source.prompt, adjust(source.intent, nudge), source.id, 'draft', 'Nudge', update, true),
 };

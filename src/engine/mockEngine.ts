@@ -1,4 +1,4 @@
-import type { Intent, Nudge, Take, TakeKind } from '../types.ts';
+import type { GenerationKind, Intent, Nudge, Take } from '../types.ts';
 import type { EngineUpdate, GenerationEngine } from './contract.ts';
 import { pickAsset, variantFromAsset } from './assets.ts';
 import { quote } from './cost.ts';
@@ -43,7 +43,7 @@ export function createMockEngine(options: MockEngineOptions = {}): GenerationEng
   const random = createRandom(options.seed);
 
   function enqueue(
-    input: { prompt: string; intent: Intent; parentId: string | null; kind: TakeKind; label: string; free?: boolean },
+    input: { prompt: string; intent: Intent; parentId: string | null; kind: GenerationKind; label: string; free?: boolean },
     onUpdate: EngineUpdate,
     variant: number,
   ): Take {
@@ -59,9 +59,9 @@ export function createMockEngine(options: MockEngineOptions = {}): GenerationEng
       progress: 0,
       createdAt: Date.now(),
     };
-    const timing = planTiming(take.kind, random, timeScale);
+    const timing = planTiming(input.kind, random, timeScale);
     const error = failureFor(random, outcome);
-    const assetUrl = pickAsset(take.kind, take.intent, variant);
+    const assetUrl = pickAsset(input.kind, take.intent, variant);
 
     // Each notification is an independent snapshot, including its nested intent.
     // Schedule relative to launch, avoiding cumulative drift and callback-order RNG.
@@ -99,7 +99,7 @@ export function createMockEngine(options: MockEngineOptions = {}): GenerationEng
       return batch(source.prompt, source.intent, source.id, 'Variant', update);
     },
     retry({ failed }, update) {
-      if (failed.status !== 'failed') throw new Error('Choose a failed take to reroll.');
+      if (failed.status !== 'failed' || failed.kind === 'edit') throw new Error('Choose a failed take to reroll.');
       return enqueue({
         prompt: failed.prompt, intent: failed.intent, parentId: failed.id,
         kind: failed.kind, label: 'Reroll', free: true,

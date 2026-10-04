@@ -1,49 +1,36 @@
 import type { Transition, Variants } from 'framer-motion';
 
-// Signature easing from the design system: expo-out cubic-bezier(0.16,1,0.3,1).
-// Entering uses ease-out; exits are quicker (see `exit` transitions below).
-export const EASE_EXPO: [number, number, number, number] = [0.16, 1, 0.3, 1];
+// Motion is functional and quick: things arrive, settle, and get out of the way.
+// One ease-out curve, short durations, small distances, no springs or bounces.
+// Exits are faster than entrances.
+export const EASE_OUT: [number, number, number, number] = [0.2, 0, 0, 1];
 
-export const tBase: Transition = { duration: 0.42, ease: EASE_EXPO };
-export const tFast: Transition = { duration: 0.22, ease: EASE_EXPO };
-export const tSpring: Transition = { type: 'spring', stiffness: 90, damping: 20, mass: 0.9 };
-export const tPress: Transition = { type: 'spring', stiffness: 400, damping: 26 };
+export const tQuick: Transition = { duration: 0.16, ease: EASE_OUT };
+export const tBase: Transition = { duration: 0.24, ease: EASE_OUT };
+/** Shared-element moves (a draft frame growing into the stage). */
+export const tLayout: Transition = { duration: 0.32, ease: EASE_OUT };
 
-/** Staggered reveal for a batch of drafts — feels alive, not popped-in at once. */
+/** Drafts arrive in order, one after another — the batch reads as a sequence. */
 export const gridContainer: Variants = {
   hidden: {},
-  show: {
-    transition: { staggerChildren: 0.08, delayChildren: 0.04 },
-  },
+  show: { transition: { staggerChildren: 0.06 } },
 };
 
 export const gridItem: Variants = {
-  hidden: { opacity: 0, y: 14, scale: 0.97 },
-  show: { opacity: 1, y: 0, scale: 1, transition: tBase },
-  exit: { opacity: 0, y: 8, scale: 0.98, transition: tFast },
-};
-
-/** A settle used when a take flips from generating → ready. */
-export const settle: Variants = {
-  initial: { opacity: 0, scale: 1.04 },
-  animate: { opacity: 1, scale: 1, transition: tBase },
+  hidden: { opacity: 0, y: 8 },
+  show: { opacity: 1, y: 0, transition: tBase },
+  exit: { opacity: 0, transition: tQuick },
 };
 
 export const fadeUp: Variants = {
-  hidden: { opacity: 0, y: 10 },
+  hidden: { opacity: 0, y: 6 },
   show: { opacity: 1, y: 0, transition: tBase },
-  exit: { opacity: 0, y: 6, transition: tFast },
+  exit: { opacity: 0, y: 4, transition: tQuick },
 };
 
-export const scaleIn: Variants = {
-  hidden: { opacity: 0, scale: 0.96 },
-  show: { opacity: 1, scale: 1, transition: tSpring },
-  exit: { opacity: 0, scale: 0.98, transition: tFast },
-};
-
-/** Subtle press feedback for interactive controls. */
-export const pressable = {
-  whileHover: { scale: 1.02 },
-  whileTap: { scale: 0.97 },
-  transition: tPress,
+/** Version-history rows slide in from the panel edge. */
+export const slideIn: Variants = {
+  hidden: { opacity: 0, x: 8 },
+  show: { opacity: 1, x: 0, transition: tBase },
+  exit: { opacity: 0, transition: tQuick },
 };

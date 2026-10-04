@@ -1,119 +1,116 @@
-import { motion } from 'framer-motion';
-import type { ComponentPropsWithoutRef, ReactNode } from 'react';
-import { Loader2 } from 'lucide-react';
+import { forwardRef, type ComponentPropsWithoutRef, type ReactNode } from 'react';
 import { cn } from '@/lib/cn';
-import { tPress } from '@/lib/motion';
-import type { TakeStatus } from '@/types';
 import { costLabel } from '@/lib/cost';
+import type { TakeStatus } from '@/types';
 
-type ButtonVariant = 'primary' | 'accent' | 'subtle' | 'ghost' | 'danger';
+type ButtonVariant = 'primary' | 'secondary' | 'quiet' | 'danger';
 type ButtonSize = 'sm' | 'md' | 'lg' | 'icon';
 
 const VARIANT: Record<ButtonVariant, string> = {
-  primary:
-    'bg-gradient-to-b from-primary to-primary-600 text-white shadow-[0_6px_24px_-8px_rgba(236,72,153,0.6)] hover:shadow-glow',
-  accent:
-    'bg-gradient-to-b from-accent to-accent-600 text-white shadow-[0_6px_24px_-8px_rgba(99,102,241,0.6)] hover:shadow-glow-accent',
-  subtle: 'bg-white/[0.06] text-fg border border-border-strong hover:bg-white/[0.10]',
-  ghost: 'bg-transparent text-fg-muted hover:text-fg hover:bg-white/[0.06]',
-  danger: 'bg-danger-600/90 text-white hover:bg-danger-600',
+  // The accent is reserved for the one action that moves the work forward.
+  primary: 'bg-mark text-on-mark enabled:hover:bg-mark/90 disabled:bg-ink/15 disabled:text-ink-3',
+  secondary: 'border border-ink/70 bg-transparent text-ink enabled:hover:bg-ink/[0.06] disabled:border-edge/60 disabled:text-ink-3',
+  quiet: 'bg-transparent text-ink-2 enabled:hover:bg-ink/[0.06] enabled:hover:text-ink disabled:text-ink-3',
+  danger: 'bg-bad text-sheet enabled:hover:bg-bad/90',
 };
 
+// Heights are minimums: in a narrow column a label wraps and the button grows
+// instead of letting text spill outside it.
 const SIZE: Record<ButtonSize, string> = {
-  sm: 'h-9 px-3 text-sm rounded-lg gap-1.5',
-  md: 'h-11 px-4 text-sm rounded-xl gap-2',
-  lg: 'h-12 px-5 text-[15px] rounded-xl gap-2',
-  icon: 'h-10 w-10 rounded-xl justify-center',
+  sm: 'min-h-9 px-3 py-1.5 text-sm gap-x-2 gap-y-0.5',
+  md: 'min-h-11 px-4 py-2 text-[15px] gap-x-2 gap-y-0.5',
+  lg: 'min-h-12 px-5 py-2.5 text-base gap-x-2.5 gap-y-0.5',
+  icon: 'h-11 w-11 justify-center',
 };
 
-interface ButtonProps extends Omit<ComponentPropsWithoutRef<typeof motion.button>, 'ref' | 'children'> {
+interface ButtonProps extends ComponentPropsWithoutRef<'button'> {
   variant?: ButtonVariant;
   size?: ButtonSize;
-  loading?: boolean;
   leftIcon?: ReactNode;
-  children?: ReactNode;
 }
 
-export function Button({
-  variant = 'subtle',
-  size = 'md',
-  loading = false,
-  leftIcon,
-  className,
-  children,
-  disabled,
-  ...rest
-}: ButtonProps) {
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
+  { variant = 'secondary', size = 'md', leftIcon, className, children, type = 'button', ...rest },
+  ref,
+) {
   return (
-    <motion.button
-      whileTap={disabled || loading ? undefined : { scale: 0.97 }}
-      transition={tPress}
-      disabled={disabled || loading}
+    <button
+      ref={ref}
+      type={type}
       className={cn(
-        'inline-flex select-none items-center justify-center font-medium tracking-tight',
-        'transition-colors duration-200 ease-expo cursor-pointer',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-bg',
-        'disabled:cursor-not-allowed disabled:opacity-45',
+        'tap inline-flex select-none flex-wrap items-center justify-center rounded text-center font-semibold leading-tight',
+        'transition-colors duration-150 ease-out active:translate-y-px',
+        'disabled:cursor-not-allowed disabled:active:translate-y-0',
         VARIANT[variant],
         SIZE[size],
         className,
       )}
       {...rest}
     >
-      {loading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : leftIcon}
+      {leftIcon}
       {children}
-    </motion.button>
+    </button>
   );
-}
+});
 
 export function Kbd({ children }: { children: ReactNode }) {
   return (
-    <kbd className="tnum rounded-md border border-border-strong bg-white/[0.04] px-1.5 py-0.5 text-[11px] font-medium text-fg-muted">
+    <kbd className="tnum inline-flex h-6 min-w-6 items-center justify-center rounded-sm border border-edge/70 bg-sheet px-1.5 font-sans text-xs font-semibold text-ink-2">
       {children}
     </kbd>
   );
 }
 
-export function CostChip({ cost, className }: { cost: number; className?: string }) {
-  const free = cost === 0;
+/** A price as plain text. Inside a button it sits after a thin divider. */
+export function Cost({ cost, className }: { cost: number; className?: string }) {
+  return <span className={cn('tnum font-medium', className)}>{costLabel(cost)}</span>;
+}
+
+/** Cost appended to a button label: "Render final | 8 credits". Wraps as one unit. */
+export function ButtonCost({ cost }: { cost: number }) {
   return (
-    <span
-      className={cn(
-        'tnum inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold',
-        free
-          ? 'border-success/30 bg-success/10 text-success'
-          : 'border-accent/30 bg-accent/10 text-accent',
-        className,
-      )}
-    >
-      {costLabel(cost)}
+    <span className="inline-flex items-center gap-2 whitespace-nowrap">
+      <span aria-hidden className="h-4 w-px bg-current opacity-40" />
+      <span className="tnum font-medium">{costLabel(cost)}</span>
     </span>
   );
 }
 
-const STATUS_META: Record<TakeStatus, { label: string; dot: string; text: string }> = {
-  queued: { label: 'Queued', dot: 'bg-fg-subtle', text: 'text-fg-subtle' },
-  generating: { label: 'Generating', dot: 'bg-accent', text: 'text-accent' },
-  ready: { label: 'Ready', dot: 'bg-success', text: 'text-success' },
-  failed: { label: 'Failed', dot: 'bg-danger', text: 'text-danger' },
+const STATUS_META: Record<TakeStatus, { label: string; text: string }> = {
+  queued: { label: 'Queued', text: 'text-ink-3' },
+  generating: { label: 'Generating', text: 'text-ink-2' },
+  ready: { label: 'Ready', text: 'text-ok' },
+  failed: { label: 'Failed', text: 'text-bad' },
 };
 
-export function StatusPill({ status }: { status: TakeStatus }) {
-  const m = STATUS_META[status];
+/** Empty, half, and full squares: the shape says it before the color does. */
+function StatusSquare({ status }: { status: TakeStatus }) {
   return (
-    <span className={cn('inline-flex items-center gap-1.5 text-[11px] font-medium', m.text)}>
-      <span
-        className={cn(
-          'h-1.5 w-1.5 rounded-full',
-          m.dot,
-          (status === 'generating' || status === 'queued') && 'animate-pulse-soft',
-        )}
-      />
-      {m.label}
+    <span aria-hidden className="relative h-2 w-2 shrink-0 border border-current">
+      {status === 'generating' && <span className="absolute inset-x-0 bottom-0 h-1/2 bg-current" />}
+      {(status === 'ready' || status === 'failed') && <span className="absolute inset-0 bg-current" />}
     </span>
   );
 }
 
-export function Spinner({ className }: { className?: string }) {
-  return <Loader2 className={cn('h-4 w-4 animate-spin', className)} aria-hidden />;
+/** Status as words plus a small square: shape and text carry it, color confirms it. */
+export function Status({ status, progress, className }: { status: TakeStatus; progress?: number; className?: string }) {
+  const m = STATUS_META[status];
+  const pct = status === 'generating' && progress !== undefined ? ` ${Math.round(progress * 100)}%` : '';
+  return (
+    <span className={cn('tnum inline-flex items-center gap-1.5 text-[13px] font-medium', m.text, className)}>
+      <StatusSquare status={status} />
+      {m.label}
+      {pct}
+    </span>
+  );
+}
+
+/** Form label: sentence case, readable size — never a tiny all-caps tag. */
+export function Label({ children, htmlFor, className }: { children: ReactNode; htmlFor?: string; className?: string }) {
+  return (
+    <label htmlFor={htmlFor} className={cn('text-sm font-semibold text-ink', className)}>
+      {children}
+    </label>
+  );
 }

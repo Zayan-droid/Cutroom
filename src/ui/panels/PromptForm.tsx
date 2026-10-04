@@ -1,26 +1,25 @@
-import { useState } from 'react';
-import { Sparkles, SlidersHorizontal, ArrowUp } from 'lucide-react';
-import { cn } from '@/lib/cn';
+import { useEffect, useId, useRef, useState } from 'react';
 import { actions } from '@/store';
 import type { IntentKind, Intent } from '@/types';
-import { Button, CostChip, Kbd } from '@/ui/components/ui';
+import { Button, ButtonCost, Kbd } from '@/ui/components/ui';
+import { Glyph } from '@/ui/components/Glyph';
 import { IntentSelector } from './IntentSelector';
 import { PromptAssist, type AssistFields } from './PromptAssist';
+import { cn } from '@/lib/cn';
+import { quote } from '@/lib/cost';
 
 const EMPTY: AssistFields = { subject: '', style: '', motion: '', mood: '' };
 
-const SURPRISES: Array<{ prompt: string; kind: IntentKind } & AssistFields> = [
-  { prompt: 'A lone astronaut drifting past a neon ringed planet', kind: 'cinematic', subject: 'A lone astronaut', style: 'anamorphic, 35mm film grain', motion: 'slow dolly-in', mood: 'awe, quiet tension' },
-  { prompt: 'Sleek smartwatch rotating on a marble pedestal', kind: 'ad', subject: 'A smartwatch', style: 'studio softbox, glossy', motion: 'orbit, 360°', mood: 'premium, clean' },
-  { prompt: 'Skater landing a kickflip in golden-hour haze', kind: 'social', subject: 'A street skater', style: 'handheld, warm grade', motion: 'whip-pan, fast cut', mood: 'kinetic, joyful' },
-  { prompt: 'Rain-slicked Tokyo alley glowing with signage', kind: 'cinematic', subject: 'A neon alley', style: 'blade-runner, deep teal', motion: 'steady tracking', mood: 'moody, cinematic' },
+/** Worked examples: each fills the prompt, the format, and the details. */
+export const EXAMPLES: Array<{ title: string; prompt: string; kind: IntentKind } & AssistFields> = [
+  { title: 'Astronaut drifting past a planet', prompt: 'A lone astronaut drifting past a ringed planet', kind: 'cinematic', subject: 'A lone astronaut', style: 'Anamorphic, 35mm, cold light', motion: 'Slow dolly-in', mood: 'Awe, quiet tension' },
+  { title: 'Watch on a marble pedestal', prompt: 'A smartwatch rotating on a marble pedestal', kind: 'ad', subject: 'A smartwatch', style: 'Studio softbox, glossy reflections', motion: 'Slow 360° orbit', mood: 'Premium, clean' },
+  { title: 'Golden-hour kickflip', prompt: 'A skater landing a kickflip in golden-hour haze', kind: 'social', subject: 'A street skater', style: 'Handheld, warm grade', motion: 'Whip-pan, fast cut', mood: 'Kinetic, joyful' },
 ];
 
-const QUICK: Array<{ label: string; prompt: string; kind: IntentKind }> = [
-  { label: 'Neon city night', prompt: 'A neon city at night, rain-slicked streets reflecting signs', kind: 'cinematic' },
-  { label: 'Product spin', prompt: 'Sleek wireless earbuds spinning on a pedestal', kind: 'ad' },
-  { label: 'Golden-hour skate', prompt: 'Skater landing a trick in golden hour', kind: 'social' },
-];
+export const SHOT_INPUT_ID = 'shot-input';
+
+const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.userAgent);
 
 function buildIntent(kind: IntentKind, prompt: string, f: AssistFields): Intent {
   return {
@@ -39,131 +38,177 @@ function compose(prompt: string, f: AssistFields): string {
 
 export function PromptForm({
   variant,
+  kind,
+  initialKind = 'cinematic',
+  onKindChange,
   onSubmitted,
 }: {
   variant: 'hero' | 'bar';
+  /** The format can be lifted to a parent that previews it. */
+  kind?: IntentKind;
+  /** Starting format when the form owns it — e.g. the format of the batch on screen. */
+  initialKind?: IntentKind;
+  onKindChange?: (k: IntentKind) => void;
   onSubmitted?: () => void;
 }) {
   const [prompt, setPrompt] = useState('');
-  const [kind, setKind] = useState<IntentKind>('cinematic');
+  const [ownKind, setOwnKind] = useState<IntentKind>(initialKind);
   const [assistOpen, setAssistOpen] = useState(false);
   const [fields, setFields] = useState<AssistFields>(EMPTY);
+  const textRef = useRef<HTMLTextAreaElement>(null);
+  const assistId = useId();
+  const hintId = useId();
+  const examplesId = useId();
+
+  const format = kind ?? ownKind;
+  const setFormat = (k: IntentKind) => (onKindChange ? onKindChange(k) : setOwnKind(k));
 
   const effective = compose(prompt, fields);
   const canSubmit = effective.length > 0;
 
   const submit = () => {
     if (!canSubmit) return;
-    actions.submitDraft(effective, buildIntent(kind, prompt, fields));
+    actions.submitDraft(effective, buildIntent(format, prompt, fields));
     onSubmitted?.();
   };
 
-  const surprise = () => {
-    const s = SURPRISES[Math.floor(Math.random() * SURPRISES.length)];
-    setPrompt(s.prompt);
-    setKind(s.kind);
-    setFields({ subject: s.subject, style: s.style, motion: s.motion, mood: s.mood });
+  const applyExample = (e: (typeof EXAMPLES)[number]) => {
+    setPrompt(e.prompt);
+    setFormat(e.kind);
+    setFields({ subject: e.subject, style: e.style, motion: e.motion, mood: e.mood });
     setAssistOpen(true);
+    textRef.current?.focus();
   };
 
-  const setField = (key: keyof AssistFields, value: string) =>
-    setFields((prev) => ({ ...prev, [key]: value }));
+  const setField = (key: keyof AssistFields, value: string) => setFields((prev) => ({ ...prev, [key]: value }));
 
-  // ── Compact bar (working mode) ──────────────────────────────────────────────
+  // Only take focus on a desktop pointer; on phones autofocus would throw up the keyboard.
+  useEffect(() => {
+    if (variant === 'hero' && window.matchMedia('(min-width: 1024px) and (pointer: fine)').matches) {
+      textRef.current?.focus();
+    }
+  }, [variant]);
+
+  // ── Compact row (working view) ──────────────────────────────────────────────
   if (variant === 'bar') {
     return (
-      <div className="rounded-2xl border border-border bg-surface/70 p-2 shadow-card backdrop-blur-md">
-        <div className="flex flex-wrap items-center gap-2">
+      <form
+        className="flex flex-wrap items-end gap-x-3 gap-y-2 lg:items-center"
+        onSubmit={(e) => {
+          e.preventDefault();
+          submit();
+        }}
+      >
+        <div className="flex min-w-[220px] flex-1 flex-col gap-1 lg:flex-row lg:items-center lg:gap-3">
+          <label htmlFor={SHOT_INPUT_ID} className="whitespace-nowrap text-sm font-semibold text-ink">
+            New prompt
+          </label>
           <input
+            id={SHOT_INPUT_ID}
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                submit();
-              }
-            }}
-            placeholder="Describe the next take…"
-            aria-label="Prompt"
-            className="h-11 min-w-[180px] flex-1 rounded-xl border border-transparent bg-black/20 px-3.5 text-sm text-fg placeholder:text-fg-subtle/70 focus:border-primary/40 focus:outline-none focus:ring-1 focus:ring-primary/40"
+            placeholder="Describe the next shot"
+            autoComplete="off"
+            className="h-11 w-full rounded border border-edge bg-field px-3 font-text text-[17px] text-ink placeholder:text-ink-3/80 focus:border-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-ink"
           />
-          <IntentSelector value={kind} onChange={setKind} size="sm" />
-          <Button variant="ghost" size="icon" onClick={surprise} title="Surprise me" aria-label="Surprise me">
-            <Sparkles className="h-4 w-4" />
-          </Button>
-          <Button variant="primary" size="md" onClick={submit} disabled={!canSubmit} leftIcon={<ArrowUp className="h-4 w-4" />}>
-            Draft
-            <CostChip cost={0} className="ml-0.5" />
-          </Button>
         </div>
-      </div>
+        <IntentSelector value={format} onChange={setFormat} size="compact" legend="Format" hideLegend />
+        <Button type="submit" variant="primary" disabled={!canSubmit}>
+          Generate 4 drafts
+          <ButtonCost cost={quote('draft', format)} />
+        </Button>
+      </form>
     );
   }
 
-  // ── Hero (land / empty state) ───────────────────────────────────────────────
+  // ── Full composer (opening screen) ──────────────────────────────────────────
   return (
-    <div className="w-full rounded-3xl border border-border bg-surface/60 p-4 shadow-card backdrop-blur-md sm:p-5">
-      <textarea
-        value={prompt}
-        onChange={(e) => setPrompt(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-            e.preventDefault();
-            submit();
-          }
-        }}
-        rows={3}
-        autoFocus
-        placeholder="Describe what you want to see. A neon city at night, slow dolly-in, cinematic…"
-        aria-label="Prompt"
-        className="w-full resize-none rounded-2xl border border-transparent bg-black/20 p-4 text-[15px] leading-relaxed text-fg placeholder:text-fg-subtle/70 focus:border-primary/40 focus:outline-none focus:ring-1 focus:ring-primary/40"
-      />
-
-      <PromptAssist open={assistOpen} fields={fields} set={setField} onSurprise={surprise} />
-
-      <div className="mt-4 flex flex-wrap items-center gap-3">
-        <IntentSelector value={kind} onChange={setKind} />
-        <button
-          type="button"
-          onClick={() => setAssistOpen((v) => !v)}
-          className={cn(
-            'inline-flex cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors',
-            assistOpen ? 'bg-white/[0.06] text-fg' : 'text-fg-muted hover:text-fg hover:bg-white/[0.04]',
-          )}
-        >
-          <SlidersHorizontal className="h-4 w-4" aria-hidden />
-          Prompt assist
-        </button>
-
-        <div className="ml-auto flex items-center gap-3">
-          <span className="hidden text-xs text-fg-subtle sm:flex sm:items-center sm:gap-1.5">
-            <Kbd>⌘</Kbd>
-            <Kbd>↵</Kbd>
-            to draft
+    <form
+      className="flex flex-col gap-5 sm:gap-6"
+      onSubmit={(e) => {
+        e.preventDefault();
+        submit();
+      }}
+    >
+      <div className="flex flex-col gap-2">
+        <label htmlFor={SHOT_INPUT_ID} className="text-sm font-semibold text-ink">
+          Describe the shot
+        </label>
+        <textarea
+          id={SHOT_INPUT_ID}
+          ref={textRef}
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+              e.preventDefault();
+              submit();
+            }
+          }}
+          rows={3}
+          placeholder="For example: rain on a neon-lit street at night, a cyclist passes, the camera follows."
+          aria-describedby={hintId}
+          className="w-full resize-y rounded border border-edge bg-field p-3.5 font-text text-[19px] leading-relaxed text-ink placeholder:text-ink-3/80 focus:border-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-ink sm:min-h-[9.5rem]"
+        />
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-sm">
+          <span id={examplesId} className="text-ink-2">
+            Or start from an example:
           </span>
-          <Button variant="primary" size="lg" onClick={submit} disabled={!canSubmit} leftIcon={<Sparkles className="h-4 w-4" />}>
-            Draft 4 takes
-            <CostChip cost={0} className="ml-1" />
-          </Button>
+          <ul aria-labelledby={examplesId} className="flex flex-wrap gap-x-4">
+            {EXAMPLES.map((e) => (
+              <li key={e.title}>
+                <button
+                  type="button"
+                  onClick={() => applyExample(e)}
+                  className="py-1.5 text-left font-medium text-ink underline decoration-edge underline-offset-[3px] transition-colors hover:decoration-ink"
+                >
+                  {e.title}
+                </button>
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border pt-4">
-        <span className="text-xs text-fg-subtle">Try:</span>
-        {QUICK.map((q) => (
-          <button
-            key={q.label}
-            type="button"
-            onClick={() => {
-              setPrompt(q.prompt);
-              setKind(q.kind);
-            }}
-            className="cursor-pointer rounded-full border border-border bg-white/[0.03] px-3 py-1 text-xs text-fg-muted transition-colors hover:border-border-strong hover:text-fg"
+      <IntentSelector value={format} onChange={setFormat} />
+
+      <div className="flex flex-col gap-3">
+        <button
+          type="button"
+          aria-expanded={assistOpen}
+          aria-controls={assistId}
+          onClick={() => setAssistOpen((v) => !v)}
+          className="tap flex max-w-full items-start gap-2 self-start text-left text-sm font-semibold text-ink"
+        >
+          <span
+            aria-hidden
+            className={cn('grid h-5 w-5 shrink-0 place-items-center rounded-sm border border-edge text-ink-2 transition-transform', assistOpen && 'rotate-45')}
           >
-            {q.label}
-          </button>
-        ))}
+            <Glyph name="plus" className="h-3 w-3" />
+          </span>
+          <span className="flex flex-wrap gap-x-2">
+            <span>{assistOpen ? 'Hide details' : 'Add details'}</span>
+            <span className="font-normal text-ink-3">optional — subject, look, camera, mood</span>
+          </span>
+        </button>
+        <PromptAssist id={assistId} open={assistOpen} fields={fields} set={setField} />
       </div>
-    </div>
+
+      {/* On phones the action row sticks to the bottom of the screen while the form scrolls. */}
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-rule pt-5 max-sm:sticky max-sm:bottom-0 max-sm:z-20 max-sm:-mx-5 max-sm:-mb-5 max-sm:bg-sheet max-sm:px-5 max-sm:pb-3 max-sm:pt-3">
+        <Button type="submit" variant="primary" size="lg" disabled={!canSubmit} aria-describedby={hintId}>
+          Generate 4 drafts
+          <ButtonCost cost={quote('draft', format)} />
+        </Button>
+        <p id={hintId} className="max-w-sm text-sm leading-snug text-ink-2">
+          {canSubmit
+            ? 'Four short drafts, side by side. Render only the one you pick.'
+            : 'Describe the shot, or pick an example, to generate drafts.'}{' '}
+          <span className="hidden whitespace-nowrap text-ink-3 lg:inline">
+            <Kbd>{isMac ? '⌘' : 'Ctrl'}</Kbd> <Kbd>Enter</Kbd>
+          </span>
+        </p>
+      </div>
+    </form>
   );
 }

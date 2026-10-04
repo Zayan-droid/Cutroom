@@ -2,7 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { quote, costLabel } from '../src/lib/cost.ts';
 import { cn } from '../src/lib/cn.ts';
-import { hashId, posterColors, posterStyle, aspectFor } from '../src/lib/media.ts';
+import { hashId, posterColors, posterStyle, aspectFor, ratioLabel, sceneLayout, mixHex } from '../src/lib/media.ts';
+import { hotkeyName, resolveHotkey } from '../src/lib/hotkeys.ts';
+import { fileExtension, slugify, takeAsset, takeFileName } from '../src/lib/download.ts';
 
 // Part C — UI. The src/lib helpers are pure and were untested. They back the
 // cost chips, poster placeholders, and layout, so pinning them guards the
@@ -14,12 +16,14 @@ test('cost.quote mirrors the engine price list', () => {
   assert.equal(quote('render', 'social'), 4);
   assert.equal(quote('render', 'ad'), 6);
   assert.equal(quote('render', 'cinematic'), 8);
+  assert.equal(quote('edit', 'cinematic'), 0);
 });
 
-test('cost.costLabel reads "Free" at zero and "N cr" otherwise', () => {
+test('cost.costLabel reads "Free" at zero and spells out credits otherwise', () => {
   assert.equal(costLabel(0), 'Free');
-  assert.equal(costLabel(4), '4 cr');
-  assert.equal(costLabel(8), '8 cr');
+  assert.equal(costLabel(1), '1 credit');
+  assert.equal(costLabel(4), '4 credits');
+  assert.equal(costLabel(8), '8 credits');
 });
 
 test('cn joins truthy class names and drops falsy ones', () => {
@@ -43,16 +47,112 @@ test('posterColors returns a stable hex pair from the palette', () => {
   assert.deepEqual(posterColors('take-1'), pair, 'stable for the same id');
 });
 
-test('posterStyle is deterministic and includes gradient layers', () => {
+test('posterStyle is deterministic and layers sky and light over the land color', () => {
   const style = posterStyle('take-1');
-  assert.equal(style.backgroundColor, '#0A0E1C');
+  const [sky, land] = posterColors('take-1');
+  assert.equal(style.backgroundColor, land);
   assert.match(style.backgroundImage, /radial-gradient/);
   assert.match(style.backgroundImage, /linear-gradient/);
+  assert.ok(style.backgroundImage.includes(sky), 'sky band uses the pair');
   assert.deepEqual(posterStyle('take-1'), style);
+});
+
+test('sceneLayout keeps the light above the ridge and the ridge above the horizon', () => {
+  for (const id of ['take-1', 'scene-a', 'x', '']) {
+    const { horizon, ridge, lightY } = sceneLayout(id);
+    assert.ok(lightY < ridge && ridge < horizon && horizon < 100, id);
+  }
+});
+
+test('mixHex blends channel-wise and clamps to the endpoints', () => {
+  assert.equal(mixHex('#000000', '#FFFFFF', 0), '#000000');
+  assert.equal(mixHex('#000000', '#FFFFFF', 1), '#FFFFFF');
+  assert.equal(mixHex('#000000', '#FF8800', 0.5), '#804400');
 });
 
 test('aspectFor maps each intent to its aspect ratio', () => {
   assert.equal(aspectFor('social'), '9 / 16');
   assert.equal(aspectFor('ad'), '4 / 5');
   assert.equal(aspectFor('cinematic'), '16 / 9');
+});
+
+test('ratioLabel prints the conventional ratio notation', () => {
+  assert.equal(ratioLabel('social'), '9:16');
+  assert.equal(ratioLabel('ad'), '4:5');
+  assert.equal(ratioLabel('cinematic'), '16:9');
+});
+
+// Shortcuts. A bare 'r' renders (and spends credits), so a modified press like
+// Ctrl/Cmd+R (refresh) must never fall back to it.
+const press = (key, mods = {}) => ({ key, ctrlKey: false, metaKey: false, altKey: false, shiftKey: false, ...mods });
+const takeKeys = { r: 'render', m: 'remix', n: 'new prompt', escape: 'back', arrowleft: 'prev' };
+
+test('hotkeyName orders modifiers and folds Ctrl and Cmd into mod', () => {
+  assert.equal(hotkeyName(press('r')), 'r');
+  assert.equal(hotkeyName(press('R', { ctrlKey: true, shiftKey: true })), 'mod+shift+r');
+  assert.equal(hotkeyName(press('r', { metaKey: true })), 'mod+r');
+  assert.equal(hotkeyName(press('r', { altKey: true })), 'alt+r');
+  assert.equal(hotkeyName(press('ArrowLeft')), 'arrowleft');
+});
+
+test('browser shortcuts never trigger bare-key actions (Ctrl/Cmd+R refreshes, not renders)', () => {
+  assert.equal(resolveHotkey(press('r', { ctrlKey: true }), takeKeys), undefined);
+  assert.equal(resolveHotkey(press('r', { metaKey: true }), takeKeys), undefined);
+  assert.equal(resolveHotkey(press('R', { ctrlKey: true, shiftKey: true }), takeKeys), undefined);
+  assert.equal(resolveHotkey(press('R', { shiftKey: true }), takeKeys), undefined);
+  assert.equal(resolveHotkey(press('r', { altKey: true }), takeKeys), undefined);
+  assert.equal(resolveHotkey(press('n', { ctrlKey: true }), takeKeys), undefined);
+  assert.equal(resolveHotkey(press('m', { metaKey: true }), takeKeys), undefined);
+});
+
+test('ordinary R, M, N, arrow, and Escape shortcuts still fire', () => {
+  assert.equal(resolveHotkey(press('r'), takeKeys), 'render');
+  assert.equal(resolveHotkey(press('m'), takeKeys), 'remix');
+  assert.equal(resolveHotkey(press('n'), takeKeys), 'new prompt');
+  assert.equal(resolveHotkey(press('ArrowLeft'), takeKeys), 'prev');
+  assert.equal(resolveHotkey(press('Escape'), takeKeys), 'back');
+});
+
+test('while typing, bare keys go to the field; Escape and modifier combos still fire', () => {
+  const keys = { ...takeKeys, 'mod+enter': 'submit' };
+  assert.equal(resolveHotkey(press('r'), keys, true), undefined);
+  assert.equal(resolveHotkey(press('ArrowLeft'), keys, true), undefined);
+  assert.equal(resolveHotkey(press('Escape'), keys, true), 'back');
+  assert.equal(resolveHotkey(press('Enter', { ctrlKey: true }), keys, true), 'submit');
+  assert.equal(resolveHotkey(press('Enter', { metaKey: true }), keys, true), 'submit');
+  assert.equal(resolveHotkey(press('Enter', { ctrlKey: true, altKey: true }), keys, true), undefined);
+  assert.equal(resolveHotkey(press('Enter'), keys, true), undefined);
+});
+
+// Downloads. Finished takes save with a filename that says what they are.
+test('takeAsset only returns real media for ready takes', () => {
+  assert.equal(takeAsset({ status: 'ready', assetUrl: '/assets/a.mp4' }), '/assets/a.mp4');
+  assert.equal(takeAsset({ status: 'generating', assetUrl: '/assets/a.mp4' }), null);
+  assert.equal(takeAsset({ status: 'ready', assetUrl: 'placeholder://take-1' }), null);
+  assert.equal(takeAsset({ status: 'ready' }), null);
+});
+
+test('fileExtension prefers the response type, then the URL path', () => {
+  assert.equal(fileExtension('/x/clip.webm', 'video/mp4'), 'mp4');
+  assert.equal(fileExtension('/x/still.PNG?v=2#t', ''), 'png');
+  assert.equal(fileExtension('https://cdn.example/a/b', 'image/jpeg; charset=binary'), 'jpg');
+  assert.equal(fileExtension('blob:http://localhost/123'), 'mp4');
+  assert.equal(fileExtension('/no-extension'), 'mp4');
+});
+
+test('slugify makes short ASCII slugs and cuts at a word boundary', () => {
+  assert.equal(slugify('Rain on a neon-lit street, at night!'), 'rain-on-a-neon-lit-street-at-night');
+  assert.equal(slugify('Café crème'), 'cafe-creme');
+  assert.equal(slugify('   '), '');
+  const long = slugify('a lone astronaut drifting slowly past a ringed planet near the edge of the galaxy', 30);
+  assert.ok(long.length <= 30 && !long.endsWith('-'), long);
+});
+
+test('takeFileName names renders and drafts distinctly', () => {
+  assert.equal(
+    takeFileName({ prompt: 'Rain on a neon street', kind: 'render', label: 'Render' }, '/a/r.mp4'),
+    'cutroom-rain-on-a-neon-street-final-render.mp4',
+  );
+  assert.equal(takeFileName({ prompt: 'Rain', kind: 'draft', label: 'Draft 2' }, '/a/d.webm'), 'cutroom-rain-draft-2.webm');
+  assert.equal(takeFileName({ prompt: '!!!', kind: 'draft' }, '/a/d', 'image/png'), 'cutroom-take-draft.png');
 });
