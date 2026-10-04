@@ -1,6 +1,11 @@
 import type { CSSProperties } from 'react';
 import type { IntentKind } from '@/types';
 
+/** Video files play in a <video>; anything else (remote drafts, stills) is shown as an image. */
+export function isVideoAsset(url: string): boolean {
+  return /\.(mp4|webm|mov|m4v)(\?.*)?$/i.test(url) || url.startsWith('data:video') || url.startsWith('blob:');
+}
+
 /** Deterministic non-negative hash from a string id. */
 export function hashId(id: string): number {
   let h = 2166136261;

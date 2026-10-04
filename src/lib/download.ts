@@ -1,4 +1,5 @@
 import type { Take } from '@/types';
+import { recipeSlug } from '../edit/recipe.ts';
 
 /** The take's real media URL, or null while it has none (not ready, failed, or a placeholder). */
 export function takeAsset(take: Pick<Take, 'status' | 'assetUrl'>): string | null {
@@ -40,9 +41,13 @@ export function slugify(text: string, max = 48): string {
 }
 
 /** A filename that says what the file is: "cutroom-rain-on-a-neon-street-final-render.mp4". */
-export function takeFileName(take: Pick<Take, 'prompt' | 'kind' | 'label'>, url: string, contentType = ''): string {
+export function takeFileName(take: Pick<Take, 'prompt' | 'kind' | 'label' | 'edit'>, url: string, contentType = ''): string {
   const subject = slugify(take.prompt) || 'take';
-  const version = take.kind === 'render' ? 'final-render' : slugify(take.label ?? '') || 'draft';
+  const version = take.kind === 'render'
+    ? 'final-render'
+    : take.kind === 'edit' && take.edit
+      ? `edit-${recipeSlug(take.edit)}`
+      : slugify(take.label ?? '') || 'draft';
   return `cutroom-${subject}-${version}.${fileExtension(url, contentType)}`;
 }
 

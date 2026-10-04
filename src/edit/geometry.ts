@@ -197,6 +197,18 @@ export function isFullFrame(crop: EditRecipe['crop'], size: Size): boolean {
   return px.x < 0.5 && px.y < 0.5 && px.width > size.width - 0.5 && px.height > size.height - 0.5;
 }
 
+const NAMED_ASPECTS: Array<[number, string]> = [
+  [16 / 9, '16:9'], [9 / 16, '9:16'], [1, '1:1'], [4 / 5, '4:5'], [5 / 4, '5:4'], [4 / 3, '4:3'],
+  [3 / 4, '3:4'], [3 / 2, '3:2'], [2 / 3, '2:3'], [2, '2:1'], [1 / 2, '1:2'], [21 / 9, '21:9'], [2.39, '2.39:1'],
+];
+
+/** "16:9" for familiar shapes (within 1%), else "1.85:1" / "1:1.33". */
+export function describeAspect(width: number, height: number): string {
+  const ratio = width / height;
+  for (const [value, name] of NAMED_ASPECTS) if (Math.abs(ratio / value - 1) < 0.01) return name;
+  return ratio >= 1 ? `${ratio.toFixed(2)}:1` : `1:${(1 / ratio).toFixed(2)}`;
+}
+
 // ── Render plan ───────────────────────────────────────────────────────────────
 
 export type PlanBackground = { kind: 'blur'; src: Rect } | { kind: 'color'; color: 'black' | 'white' };

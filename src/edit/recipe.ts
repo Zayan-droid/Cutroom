@@ -119,6 +119,16 @@ export function canonicalRecipe(recipe: EditRecipe, size: Size, duration?: numbe
   return next;
 }
 
+/** Field-by-field equality (recipes are plain data). */
+export function sameRecipe(a: EditRecipe, b: EditRecipe): boolean {
+  const near = (x: number, y: number) => Math.abs(x - y) < 1e-6;
+  return near(a.crop.x, b.crop.x) && near(a.crop.y, b.crop.y) && near(a.crop.width, b.crop.width) &&
+    near(a.crop.height, b.crop.height) && a.cropAspect === b.cropAspect && a.frame === b.frame && a.fit === b.fit &&
+    near(a.position.x, b.position.x) && near(a.position.y, b.position.y) && a.background === b.background &&
+    a.upscale === b.upscale &&
+    (a.trim === null || b.trim === null ? a.trim === b.trim : near(a.trim.start, b.trim.start) && near(a.trim.end, b.trim.end));
+}
+
 /** True when, for this source, the edit would produce the original picture. */
 export function isUnchanged(recipe: EditRecipe, size: Size, duration?: number): boolean {
   return !hasChanges(canonicalRecipe(recipe, size, duration));
