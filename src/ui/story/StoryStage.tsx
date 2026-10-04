@@ -15,10 +15,10 @@ export function StoryStage({ timeline, time, viseme, captions, images, reducedMo
   }, [timeline, time, viseme, images, reducedMotion]);
   const frame = frameAt(timeline, time);
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-border bg-surface shadow-card">
+    <div className="relative overflow-hidden border border-rule bg-well">
       <div className="aspect-video">
-      <canvas ref={ref} width={FRAME_WIDTH} height={FRAME_HEIGHT} className="h-full w-full" role="img"
-        aria-label={`${timeline.title}, scene ${(frame.scene?.index ?? 0) + 1} of ${timeline.scenes.length}`} />
+        <canvas ref={ref} width={FRAME_WIDTH} height={FRAME_HEIGHT} className="block h-full w-full" role="img"
+          aria-label={`${timeline.title}, scene ${(frame.scene?.index ?? 0) + 1} of ${timeline.scenes.length}`} />
       </div>
       <Subtitles cue={frame.subtitle} lang={timeline.lang} enabled={captions} />
     </div>

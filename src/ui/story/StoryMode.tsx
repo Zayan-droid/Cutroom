@@ -1,8 +1,10 @@
-import { useState } from 'react';
-import { BookOpen, Check, WandSparkles } from 'lucide-react';
+import { useId, useState } from 'react';
 import type { StoryInput } from '../../story/contract';
 import type { StoryStatus, StoryTimeline } from '../../story/types';
-import { Button, CostChip } from '../components/ui';
+import { posterStyle } from '../../lib/media';
+import { cn } from '../../lib/cn';
+import { Button, ButtonCost } from '../components/ui';
+import { Glyph } from '../components/Glyph';
 import { STORY_FIXTURES } from './fixtures';
 import { LanguagePicker } from './LanguagePicker';
 import { StoryPlayer } from './StoryPlayer';
@@ -18,11 +20,15 @@ export interface StoryBinding {
   composeStory: (input: StoryInput) => void;
 }
 
+const fieldClass =
+  'w-full rounded border border-edge bg-field text-ink placeholder:text-ink-3/80 focus:border-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-ink disabled:opacity-60';
+
 export function StoryMode({ binding }: { binding?: StoryBinding }) {
   const [lang, setLang] = useState(binding?.languages[0] ?? 'en-US');
   const [prompt, setPrompt] = useState(binding?.timeline?.prompt ?? '');
   const [preview, setPreview] = useState(STORY_FIXTURES['en-US']);
   const [error, setError] = useState('');
+  const ideaId = useId();
   const languages = binding?.languages ?? Object.keys(STORY_FIXTURES);
   const selectedLang = languages.includes(lang) ? lang : languages[0] ?? '';
   const timeline = binding ? binding.timeline : preview;
@@ -41,40 +47,162 @@ export function StoryMode({ binding }: { binding?: StoryBinding }) {
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not compose this story. Please try again.'); }
   };
 
-  return <main className="mx-auto max-w-[1400px] px-4 py-6 sm:py-8">
-    <div className="mb-6 flex items-center gap-3">
-      <span className="grid h-11 w-11 place-items-center rounded-2xl border border-primary/20 bg-primary/10 text-primary"><BookOpen className="h-5 w-5" /></span>
-      <div><h1 className="text-xl font-semibold tracking-tight">Story studio</h1><p className="mt-1 text-sm text-fg-muted">A little world. Three minutes to get lost in it.</p></div>
-    </div>
-    <div className="grid items-start gap-6 lg:grid-cols-[300px_minmax(0,1fr)]">
-      <form className="space-y-5 rounded-2xl border border-border bg-surface p-5" onSubmit={(event) => { event.preventDefault(); submit(); }}>
-        {!binding && <div className="space-y-2"><span className="rounded-full border border-accent/30 bg-accent/10 px-2 py-1 text-[11px] font-medium text-fg">Player preview</span>
-          <p className="text-xs leading-relaxed text-fg-muted">Explore a prewritten story in two languages. Custom story composition is coming with the story engine.</p></div>}
-        <label className="block space-y-2 text-xs text-fg-muted"><span>{binding ? 'Your story idea' : 'Preview story'}</span>
-          <textarea rows={5} maxLength={2000} readOnly={!binding} disabled={busy} required={!!binding} value={binding ? prompt : STORY_FIXTURES[selectedLang]?.prompt ?? ''}
-            onChange={(event) => setPrompt(event.target.value)} placeholder="A character, a place, a small adventure…"
-            className="w-full resize-y rounded-xl border border-border-strong bg-bg/60 p-3 text-sm leading-relaxed text-fg placeholder:text-fg-muted" />
-        </label>
-        {binding && <button type="button" disabled={busy} onClick={() => setPrompt(STORY_FIXTURES['en-US'].prompt)} className="cursor-pointer text-xs text-primary transition-colors hover:text-fg disabled:cursor-not-allowed">Use an example idea</button>}
-        <LanguagePicker languages={languages} lang={selectedLang} onChange={setLang} disabled={busy} />
-        <Button type="submit" variant="primary" className="w-full" disabled={busy || !selectedLang || !affordable || (!!binding && !prompt.trim())} leftIcon={<WandSparkles className="h-4 w-4" />}>
-          {busy ? 'Composing…' : !binding ? 'Load preview' : failed ? 'Try again' : 'Compose story'}
-          {cost !== null && <CostChip cost={cost} />}
-        </Button>
-        {cost === null && <p role="status" className="text-xs text-danger">A price is unavailable. Please try again.</p>}
-        {cost !== null && !affordable && <p role="status" className="text-xs text-danger">This story needs {cost} credits; {binding?.credits} are available.</p>}
-        {(error || binding?.error || failed) && <p role="alert" className="text-sm text-danger">{error || binding?.error || 'This story could not be composed. Your idea is still here; try again.'}</p>}
-        <p className="text-xs leading-relaxed text-fg-muted">{binding ? 'Procedural stories with stylized scenes, spoken dialogue, and subtitles. ' : 'Scenes, spoken dialogue, and subtitles share one timeline. '}Voice availability depends on your device.</p>
-      </form>
-      {busy ? <div className="space-y-5 rounded-2xl border border-border bg-surface p-8" role="status" aria-live="polite">
-        <div className="relative aspect-video overflow-hidden rounded-xl bg-gradient-to-br from-primary/10 to-accent/20">
-          <div className="absolute inset-0 -translate-x-full animate-shimmer bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+  return (
+    <main className="mx-auto max-w-[1400px] px-4 pb-16 pt-8 sm:px-6 lg:pt-12">
+      <header className="max-w-3xl">
+        <h1 className="stretch-wide text-[32px] font-bold leading-tight tracking-tight sm:text-[40px]">Story studio</h1>
+        <p className="mt-2 text-lg leading-relaxed text-ink-2">
+          Write a story idea and pick a language. Cutroom composes a three-minute illustrated story with a
+          narrated, lip-synced character and subtitles you can download.
+        </p>
+      </header>
+
+      <div className="mt-8 grid grid-cols-1 items-start gap-8 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)] lg:gap-10">
+        <form
+          className="flex flex-col gap-5 rounded-md border border-rule bg-sheet p-5 sm:p-6"
+          onSubmit={(event) => { event.preventDefault(); submit(); }}
+        >
+          {!binding && (
+            <p className="border-l-[3px] border-ink pl-3 text-sm leading-snug text-ink-2">
+              <span className="font-semibold text-ink">Preview mode.</span> Play a prewritten story in two
+              languages. Writing your own needs the story engine.
+            </p>
+          )}
+
+          <div className="flex flex-col gap-2">
+            <label htmlFor={ideaId} className="text-sm font-semibold text-ink">
+              {binding ? 'Story idea' : 'Preview story'}
+            </label>
+            <textarea
+              id={ideaId}
+              rows={5}
+              maxLength={2000}
+              readOnly={!binding}
+              disabled={busy}
+              required={!!binding}
+              value={binding ? prompt : STORY_FIXTURES[selectedLang]?.prompt ?? ''}
+              onChange={(event) => setPrompt(event.target.value)}
+              placeholder="A character, a place, and what they want. For example: a lighthouse keeper helps a lost star find its way home."
+              className={cn(fieldClass, 'resize-y p-3 font-text text-[18px] leading-relaxed')}
+            />
+            {binding && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => setPrompt(STORY_FIXTURES['en-US'].prompt)}
+                className="w-max text-sm font-medium text-ink underline decoration-edge underline-offset-[3px] transition-colors hover:decoration-ink disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Use the example idea
+              </button>
+            )}
+          </div>
+
+          <LanguagePicker languages={languages} lang={selectedLang} onChange={setLang} disabled={busy} />
+
+          <div className="flex flex-col gap-2 border-t border-rule pt-5">
+            <Button
+              type="submit"
+              variant="primary"
+              size="lg"
+              disabled={busy || !selectedLang || !affordable || (!!binding && !prompt.trim())}
+            >
+              {busy ? 'Composing…' : !binding ? 'Load preview' : failed ? 'Try again' : 'Compose story'}
+              {cost !== null && binding && <ButtonCost cost={cost} />}
+            </Button>
+            {cost === null && <p role="status" className="text-sm text-bad">A price is unavailable right now. Please try again.</p>}
+            {cost !== null && !affordable && (
+              <p role="status" className="text-sm text-bad">This story needs {cost} credits; {binding?.credits} are available.</p>
+            )}
+            {(error || binding?.error || failed) && (
+              <p role="alert" className="text-sm text-bad">
+                {error || binding?.error || 'This story could not be composed. Your idea is still here; try again.'}
+              </p>
+            )}
+            {binding && cost !== null && affordable && !failed && (
+              <p className="text-sm text-ink-2">Charged only when the story is ready.</p>
+            )}
+          </div>
+
+          <p className="text-[13px] leading-snug text-ink-3">
+            Narration uses the voices installed in your browser, so availability differs by device. Subtitles always work.
+          </p>
+        </form>
+
+        <section aria-label="Story player" className="min-w-0">
+          {busy && binding ? (
+            <Composing timeline={binding.timeline} status={binding.status} />
+          ) : timeline && (!binding || binding.status === 'ready') ? (
+            <StoryPlayer key={timeline.id} timeline={timeline} />
+          ) : (
+            <div className="grid aspect-video place-items-center rounded-md border border-dashed border-edge bg-sheet p-8 text-center">
+              <div className="max-w-sm">
+                <p className="text-lg font-semibold text-ink">No story yet</p>
+                <p className="mt-1 text-[15px] text-ink-2">
+                  Compose a story and it plays here, scene by scene, with narration and subtitles.
+                </p>
+              </div>
+            </div>
+          )}
+        </section>
+      </div>
+    </main>
+  );
+}
+
+const STEPS = ['Outline', 'Scenes and dialogue', 'Ready to play'] as const;
+
+/** Composition progress from the engine: the planned scenes plus a real percentage. */
+function Composing({ timeline, status }: { timeline: StoryTimeline | null; status: StoryStatus | null }) {
+  const progress = timeline?.progress ?? 0;
+  const pct = Math.round(progress * 100);
+  const step = status === 'queued' ? 0 : 1;
+  const scenes = timeline?.scenes ?? [];
+  return (
+    <div role="status" aria-live="polite" className="rounded-md border border-rule bg-sheet p-5 sm:p-6">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-xl font-bold tracking-tight">
+          {status === 'queued' ? 'Planning your story' : 'Writing scenes and dialogue'}
+        </h2>
+        <span className="tnum text-lg font-semibold">{pct}%</span>
+      </div>
+
+      <div
+        role="progressbar"
+        aria-label="Story composition"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={pct}
+        className="mt-4 h-1.5 bg-ink/10"
+      >
+        <div
+          className="h-full origin-left bg-ink transition-transform duration-200 ease-out"
+          style={{ transform: `scaleX(${Math.max(0.02, progress)})` }}
+        />
+      </div>
+
+      <ol className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-[15px]">
+        {STEPS.map((label, i) => (
+          <li key={label} className={cn('inline-flex items-center gap-2', i < step ? 'text-ink' : i === step ? 'font-semibold text-ink' : 'text-ink-3')}>
+            {i < step ? <Glyph name="check" className="text-ok" /> : <span aria-hidden className="tnum w-4 text-center text-sm">{i + 1}</span>}
+            {label}
+            {i < step && <span className="sr-only">(done)</span>}
+          </li>
+        ))}
+      </ol>
+
+      {scenes.length > 0 && (
+        <div className="mt-6">
+          <p className="text-sm font-semibold text-ink">{scenes.length} scenes planned</p>
+          <ol className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {scenes.map((scene, index) => (
+              <li key={scene.id} className="flex flex-col gap-1.5">
+                <span aria-hidden className="block aspect-video border border-rule" style={posterStyle(scene.posterSeed)} />
+                <span className="text-[13px] text-ink-2">Scene {index + 1}</span>
+              </li>
+            ))}
+          </ol>
         </div>
-        <h2 className="text-lg font-semibold">{binding.status === 'queued' ? 'Finding the shape of your story' : 'Giving each scene its voice'}</h2>
-        <progress className="h-2 w-full accent-primary" value={timeline?.progress ?? 0} max={1} aria-label="Story composition progress" />
-        <ol className="flex flex-wrap gap-4 text-sm text-fg-muted"><li className="flex items-center gap-2">{binding.status === 'composing' && <Check className="h-4 w-4 text-success" />}Outline</li><li>Scenes & dialogue</li><li>Ready to play</li></ol>
-      </div> : timeline && (!binding || binding.status === 'ready') ? <StoryPlayer key={timeline.id} timeline={timeline} />
-        : <div className="grid aspect-video place-items-center rounded-2xl border border-dashed border-border-strong bg-surface p-8 text-center text-fg-muted"><p>Your story will appear here, ready to play.</p></div>}
+      )}
     </div>
-  </main>;
+  );
 }

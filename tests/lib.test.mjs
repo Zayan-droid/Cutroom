@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { quote, costLabel } from '../src/lib/cost.ts';
 import { cn } from '../src/lib/cn.ts';
-import { hashId, posterColors, posterStyle, aspectFor } from '../src/lib/media.ts';
+import { hashId, posterColors, posterStyle, aspectFor, ratioLabel, sceneLayout, mixHex } from '../src/lib/media.ts';
 
 // Part C — UI. The src/lib helpers are pure and were untested. They back the
 // cost chips, poster placeholders, and layout, so pinning them guards the
@@ -16,10 +16,11 @@ test('cost.quote mirrors the engine price list', () => {
   assert.equal(quote('render', 'cinematic'), 8);
 });
 
-test('cost.costLabel reads "Free" at zero and "N cr" otherwise', () => {
+test('cost.costLabel reads "Free" at zero and spells out credits otherwise', () => {
   assert.equal(costLabel(0), 'Free');
-  assert.equal(costLabel(4), '4 cr');
-  assert.equal(costLabel(8), '8 cr');
+  assert.equal(costLabel(1), '1 credit');
+  assert.equal(costLabel(4), '4 credits');
+  assert.equal(costLabel(8), '8 credits');
 });
 
 test('cn joins truthy class names and drops falsy ones', () => {
@@ -43,16 +44,37 @@ test('posterColors returns a stable hex pair from the palette', () => {
   assert.deepEqual(posterColors('take-1'), pair, 'stable for the same id');
 });
 
-test('posterStyle is deterministic and includes gradient layers', () => {
+test('posterStyle is deterministic and layers sky and light over the land color', () => {
   const style = posterStyle('take-1');
-  assert.equal(style.backgroundColor, '#0A0E1C');
+  const [sky, land] = posterColors('take-1');
+  assert.equal(style.backgroundColor, land);
   assert.match(style.backgroundImage, /radial-gradient/);
   assert.match(style.backgroundImage, /linear-gradient/);
+  assert.ok(style.backgroundImage.includes(sky), 'sky band uses the pair');
   assert.deepEqual(posterStyle('take-1'), style);
+});
+
+test('sceneLayout keeps the light above the ridge and the ridge above the horizon', () => {
+  for (const id of ['take-1', 'scene-a', 'x', '']) {
+    const { horizon, ridge, lightY } = sceneLayout(id);
+    assert.ok(lightY < ridge && ridge < horizon && horizon < 100, id);
+  }
+});
+
+test('mixHex blends channel-wise and clamps to the endpoints', () => {
+  assert.equal(mixHex('#000000', '#FFFFFF', 0), '#000000');
+  assert.equal(mixHex('#000000', '#FFFFFF', 1), '#FFFFFF');
+  assert.equal(mixHex('#000000', '#FF8800', 0.5), '#804400');
 });
 
 test('aspectFor maps each intent to its aspect ratio', () => {
   assert.equal(aspectFor('social'), '9 / 16');
   assert.equal(aspectFor('ad'), '4 / 5');
   assert.equal(aspectFor('cinematic'), '16 / 9');
+});
+
+test('ratioLabel prints the conventional ratio notation', () => {
+  assert.equal(ratioLabel('social'), '9:16');
+  assert.equal(ratioLabel('ad'), '4:5');
+  assert.equal(ratioLabel('cinematic'), '16:9');
 });

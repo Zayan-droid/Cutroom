@@ -1,5 +1,5 @@
 import type { StoryScene, StoryTimeline, Viseme } from '../../story/types.ts';
-import { hashId, posterColors } from '../../lib/media.ts';
+import { hashId, mixHex, posterColors, sceneLayout, SCENE_LIGHT } from '../../lib/media.ts';
 import { drawAvatar } from './Avatar.ts';
 import { frameAt } from './playback.ts';
 
@@ -7,12 +7,18 @@ export type SceneImages = ReadonlyMap<string, HTMLImageElement>;
 export const FRAME_WIDTH = 960;
 export const FRAME_HEIGHT = 540;
 
+// Frame text is burned into exported video, so it uses fixed colors and the
+// UI typeface (with a system fallback while the web font loads).
+const FRAME_INK = '#1A1814';
+const FRAME_PAPER = '#F7F3EA';
+const FRAME_FONT = 'Archivo, system-ui, sans-serif';
+
+/** Flat daylight landscape — the same sky, ridge, and light the scene thumbnail shows. */
 function sceneFrame(ctx: CanvasRenderingContext2D, scene: StoryScene, time: number, images: SceneImages, reduced: boolean) {
-  const [a, b] = posterColors(scene.posterSeed);
+  const [sky, land] = posterColors(scene.posterSeed);
   const seed = hashId(scene.posterSeed);
-  const gradient = ctx.createLinearGradient(0, 0, 960, 540);
-  gradient.addColorStop(0, '#10162b'); gradient.addColorStop(0.55, a); gradient.addColorStop(1, b);
-  ctx.fillStyle = gradient; ctx.fillRect(0, 0, 960, 540);
+  const layout = sceneLayout(scene.posterSeed);
+  ctx.fillStyle = sky; ctx.fillRect(0, 0, 960, 540);
   const image = images.get(scene.id);
   if (image) {
     const scale = Math.max(960 / image.naturalWidth, 540 / image.naturalHeight);
@@ -20,29 +26,25 @@ function sceneFrame(ctx: CanvasRenderingContext2D, scene: StoryScene, time: numb
       image.naturalWidth * scale, image.naturalHeight * scale);
   } else {
     const drift = reduced ? 0 : Math.sin(time / 9000) * 10;
-    ctx.fillStyle = '#ffffff';
-    for (let i = 0; i < 35; i++) {
-      const x = (seed + i * 173) % 960;
-      const y = (seed + i * 71) % 260;
-      ctx.globalAlpha *= 0.6;
-      ctx.fillRect(x, y, 2, 2);
-      ctx.globalAlpha /= 0.6;
-    }
-    ctx.fillStyle = '#f7e6ce';
-    ctx.beginPath(); ctx.arc(270 + seed % 230 + drift, 130, 36, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = SCENE_LIGHT;
+    ctx.beginPath(); ctx.arc(layout.lightX / 100 * 960 + drift, layout.lightY / 100 * 540, 34, 0, Math.PI * 2); ctx.fill();
+    const layers = [mixHex(sky, land, 0.45), land, mixHex(land, '#000000', 0.28)];
+    const base = [layout.ridge, layout.horizon + 4, layout.horizon + 16].map((pct) => pct / 100 * 540);
     for (let layer = 0; layer < 3; layer++) {
-      ctx.fillStyle = ['#1b234b', '#151c36', '#0b1429'][layer];
+      ctx.fillStyle = layers[layer];
       ctx.beginPath(); ctx.moveTo(0, 540);
       for (let x = 0; x <= 980; x += 20) {
-        ctx.lineTo(x, 280 + layer * 63 + Math.sin(x / 150 + seed + layer) * 45 + drift * (layer + 1));
+        ctx.lineTo(x, base[layer] + Math.sin(x / (170 - layer * 30) + seed + layer) * (26 - layer * 6) + drift * (layer + 1) * 0.6);
       }
       ctx.lineTo(960, 540); ctx.closePath(); ctx.fill();
     }
-    // A small beacon anchors the procedural landscape.
-    ctx.fillStyle = '#d6d3e8'; ctx.fillRect(185, 255, 25, 103);
-    ctx.fillStyle = '#f9dcac'; ctx.fillRect(179, 243, 37, 18);
-    ctx.fillStyle = '#242d4c';
-    ctx.beginPath(); ctx.moveTo(173, 243); ctx.lineTo(197, 222); ctx.lineTo(222, 243); ctx.fill();
+    // A small lighthouse anchors the procedural landscape.
+    const towerBase = base[1] + 8;
+    ctx.fillStyle = FRAME_PAPER; ctx.fillRect(185, towerBase - 103, 25, 103);
+    ctx.fillStyle = mixHex(land, '#000000', 0.35); ctx.fillRect(185, towerBase - 70, 25, 12);
+    ctx.fillStyle = SCENE_LIGHT; ctx.fillRect(179, towerBase - 115, 37, 14);
+    ctx.fillStyle = mixHex(land, '#000000', 0.4);
+    ctx.beginPath(); ctx.moveTo(173, towerBase - 115); ctx.lineTo(197, towerBase - 136); ctx.lineTo(222, towerBase - 115); ctx.fill();
   }
 }
 
@@ -70,7 +72,7 @@ export function drawStoryFrame(
   const { scene, dialogue, subtitle } = frameAt(timeline, time);
   ctx.save();
   ctx.clearRect(0, 0, FRAME_WIDTH, FRAME_HEIGHT);
-  ctx.fillStyle = '#0b1020'; ctx.fillRect(0, 0, FRAME_WIDTH, FRAME_HEIGHT);
+  ctx.fillStyle = FRAME_INK; ctx.fillRect(0, 0, FRAME_WIDTH, FRAME_HEIGHT);
   if (scene) {
     const index = timeline.scenes.indexOf(scene);
     const previous = timeline.scenes[index - 1];
@@ -84,16 +86,20 @@ export function drawStoryFrame(
       ctx.restore();
     } else sceneFrame(ctx, scene, time, options.images, !!options.reducedMotion);
     drawAvatar(ctx, options.viseme ?? 'rest', dialogue?.speaker ?? timeline.dialogue[0]?.speaker ?? 'Narrator');
-    ctx.font = '600 16px system-ui, sans-serif'; ctx.fillStyle = '#f8fafc';
-    ctx.fillText(`SCENE ${index + 1} / ${timeline.scenes.length}`, 32, 40);
+    // Scene marker on a solid plate so it reads over any sky.
+    const marker = `Scene ${index + 1} of ${timeline.scenes.length}`;
+    ctx.font = `600 17px ${FRAME_FONT}`;
+    const markerWidth = ctx.measureText(marker).width;
+    ctx.fillStyle = 'rgba(20, 18, 15, 0.78)'; ctx.fillRect(24, 22, markerWidth + 24, 32);
+    ctx.fillStyle = FRAME_PAPER; ctx.fillText(marker, 36, 44);
   }
   if (options.captions && subtitle) {
-    ctx.font = '500 25px system-ui, sans-serif';
+    ctx.font = `500 25px ${FRAME_FONT}`;
     const lines = wrappedText(ctx, subtitle.text, 850);
     const lineHeight = 33;
     const height = lines.length * lineHeight + 24;
-    ctx.fillStyle = 'rgba(7, 12, 25, 0.88)'; ctx.fillRect(35, 515 - height, 890, height);
-    ctx.fillStyle = '#f8fafc'; ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(20, 18, 15, 0.84)'; ctx.fillRect(35, 515 - height, 890, height);
+    ctx.fillStyle = FRAME_PAPER; ctx.textAlign = 'center';
     ctx.direction = /^(ar|fa|he|ur)(-|$)/i.test(timeline.lang) ? 'rtl' : 'ltr';
     lines.forEach((line, index) => ctx.fillText(line, 480, 515 - height + 34 + index * lineHeight));
   }

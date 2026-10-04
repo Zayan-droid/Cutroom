@@ -9,13 +9,15 @@ function isTypingTarget(el: EventTarget | null): boolean {
 }
 
 /**
- * Global keyboard bindings. Keys like 'mod+k', 'r', 'escape', 'arrowleft'.
+ * Global keyboard bindings. Keys like 'r', 'escape', 'arrowleft', 'mod+enter'.
  * Bindings are ignored while the user is typing, EXCEPT combos with a modifier
- * (mod/ctrl/meta) and 'escape', which always fire.
+ * (mod/ctrl/meta) and 'escape', which always fire. Nothing fires while a modal
+ * dialog is open — the dialog owns the keyboard (including Esc to cancel).
  */
 export function useHotkeys(bindings: Record<string, Handler>) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || document.querySelector('dialog[open]')) return;
       const mod = e.metaKey || e.ctrlKey;
       const key = e.key.toLowerCase();
       const combo = `${mod ? 'mod+' : ''}${key}`;

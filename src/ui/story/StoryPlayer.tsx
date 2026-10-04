@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useReducedMotion } from 'framer-motion';
-import { Download, Film, Square } from 'lucide-react';
 import type { StoryTimeline } from '../../story/types';
 import { posterStyle } from '../../lib/media';
+import { cn } from '../../lib/cn';
 import { Button } from '../components/ui';
+import { Glyph } from '../components/Glyph';
 import { StoryStage } from './StoryStage';
 import { Transport } from './Transport';
 import { useSpeechVoices, VoicePicker } from './LanguagePicker';
@@ -13,6 +14,8 @@ import { formatTime, frameAt } from './playback';
 import { drawStoryFrame, FRAME_HEIGHT, FRAME_WIDTH, loadSceneImages, type SceneImages } from './renderFrame';
 import { recordCanvas, recordingType, type CanvasRecording } from './export/recorder';
 import { downloadBlob, subtitlesToVtt } from './export/subtitles';
+
+const TRANSITION_NAMES: Record<string, string> = { cut: 'cut', fade: 'fade in', slide: 'slide in' };
 
 export function StoryPlayer({ timeline }: { timeline: StoryTimeline }) {
   const { voices, supported } = useSpeechVoices();
@@ -95,45 +98,79 @@ export function StoryPlayer({ timeline }: { timeline: StoryTimeline }) {
     }
   };
 
-  return <div className="min-w-0 space-y-4">
-    <div className="flex flex-wrap items-center justify-between gap-2">
-      <h2 className="text-lg font-semibold" lang={timeline.lang} dir="auto">{timeline.title}</h2>
-      <span className="text-xs text-fg-muted">{timeline.scenes.length} scenes · {formatTime(timeline.totalMs)}</span>
-    </div>
-    <StoryStage timeline={timeline} time={player.time} viseme={player.viseme} captions={captions} images={images} reducedMotion={reducedMotion} />
-    <Transport time={player.time} totalMs={timeline.totalMs} playing={player.playing} captions={captions} muted={player.muted}
-      locked={recording} preparing={preparing} onPlay={player.play} onPause={player.pause} onSeek={player.seek}
-      onCaptions={() => setCaptions((value) => !value)} onMute={player.toggleMute} />
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label="Story scenes">
-      {timeline.scenes.map((scene, index) => <button key={scene.id} disabled={recording} onClick={() => player.seek(scene.startMs)}
-        aria-label={`Go to scene ${index + 1}`} aria-current={currentScene?.id === scene.id ? 'step' : undefined}
-        className={`relative min-h-20 cursor-pointer overflow-hidden rounded-xl border p-3 text-left transition-colors disabled:cursor-not-allowed ${currentScene?.id === scene.id ? 'border-primary' : 'border-border hover:border-border-strong'}`}
-        style={posterStyle(scene.posterSeed)}>
-        <span className="block text-sm font-medium">Scene {index + 1}</span>
-        <span className="tnum text-xs text-fg-muted">{formatTime(scene.startMs)} · {scene.transition}</span>
-      </button>)}
-    </div>
-    <div className="grid gap-5 rounded-2xl border border-border bg-surface p-4 sm:grid-cols-2">
-      <VoicePicker voices={voices} supported={supported} lang={timeline.lang} voiceURI={preferredVoice} onChange={setPreferredVoice} disabled={recording} />
-      <div className="space-y-3">
-        <div className="flex flex-wrap gap-2">
-          <Button size="sm" leftIcon={<Download className="h-4 w-4" />} onClick={() => downloadBlob(new Blob([subtitlesToVtt(timeline.subtitles)], { type: 'text/vtt;charset=utf-8' }), `story-${timeline.lang}.vtt`)}>Subtitles .vtt</Button>
-          {recording ? <Button size="sm" variant="danger" leftIcon={<Square className="h-3 w-3" />} onClick={() => {
-            recorder.current?.cancel(); recorder.current = null; releaseCanvas(); setRecording(false); setPreparing(false); player.pause();
-          }}>Cancel recording</Button> : <Button size="sm" disabled={!canRecord || !imagesReady} leftIcon={<Film className="h-4 w-4" />} onClick={startRecording}>Record silent video</Button>}
-          {video && <Button size="sm" variant="accent" leftIcon={<Download className="h-4 w-4" />} onClick={() => downloadBlob(video, `story-${timeline.lang}.${video.type.includes('mp4') ? 'mp4' : 'webm'}`)}>Save video</Button>}
-        </div>
-        <p className="text-xs leading-relaxed text-fg-muted">
-          {canRecord ? 'Records from the beginning in real time. Video includes the avatar and your subtitle setting; narration is heard here but is not included in the file.' : 'Video recording is unavailable in this browser. You can still download the subtitle track.'}
-        </p>
-        {recording && <div role="status" className="space-y-1 text-xs text-primary">
-          <p>{preparing ? 'Preparing recording' : player.playing ? 'Recording' : 'Recording paused'} · {formatTime(player.time)} / {formatTime(timeline.totalMs)}</p>
-          <progress className="h-1.5 w-full accent-primary" value={player.time} max={timeline.totalMs} aria-label="Recording progress" />
-        </div>}
-        {video && <p role="status" className="text-xs text-success">Your silent video is ready to save.</p>}
-        {exportError && <p role="alert" className="text-xs text-danger">{exportError}</p>}
+  const recordPct = timeline.totalMs > 0 ? Math.min(1, player.time / timeline.totalMs) : 0;
+
+  return <div className="flex min-w-0 flex-col gap-6">
+    <div>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-rule pb-3">
+        <h2 className="font-text text-[26px] font-semibold leading-tight" lang={timeline.lang} dir="auto">{timeline.title}</h2>
+        <span className="tnum text-sm font-medium text-ink-2">{timeline.scenes.length} scenes · {formatTime(timeline.totalMs)}</span>
       </div>
+      <div className="mt-4">
+        <StoryStage timeline={timeline} time={player.time} viseme={player.viseme} captions={captions} images={images} reducedMotion={reducedMotion} />
+        <Transport time={player.time} totalMs={timeline.totalMs} playing={player.playing} captions={captions} muted={player.muted}
+          locked={recording} preparing={preparing} onPlay={player.play} onPause={player.pause} onSeek={player.seek}
+          onCaptions={() => setCaptions((value) => !value)} onMute={player.toggleMute} />
+      </div>
+      {player.notice && <p role="status" className="mt-2 text-sm text-ink-2">{player.notice}</p>}
     </div>
-    {player.notice && <p role="status" className="text-sm text-fg-muted">{player.notice}</p>}
+
+    <section aria-labelledby="scenes-title">
+      <h3 id="scenes-title" className="text-sm font-semibold text-ink">Scenes</h3>
+      <ol className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {timeline.scenes.map((scene, index) => {
+          const current = currentScene?.id === scene.id;
+          return <li key={scene.id}>
+            <button type="button" disabled={recording} onClick={() => player.seek(scene.startMs)}
+              aria-label={`Go to scene ${index + 1}, starts at ${formatTime(scene.startMs)}`} aria-current={current ? 'step' : undefined}
+              className="group flex w-full flex-col gap-1.5 text-left disabled:cursor-not-allowed disabled:opacity-60">
+              <span aria-hidden className={cn('block aspect-video w-full outline outline-offset-2 transition-[outline-color] duration-150',
+                current ? 'outline-2 outline-mark' : 'outline-1 outline-transparent group-hover:outline-edge')}
+                style={posterStyle(scene.posterSeed)} />
+              <span className="flex items-baseline justify-between gap-2">
+                <span className={cn('text-[15px]', current ? 'font-semibold text-ink' : 'font-medium text-ink-2')}>Scene {index + 1}</span>
+                <span className="tnum text-[13px] text-ink-3">{formatTime(scene.startMs)}</span>
+              </span>
+              <span className="-mt-1 text-[13px] text-ink-3">{TRANSITION_NAMES[scene.transition] ?? scene.transition}</span>
+            </button>
+          </li>;
+        })}
+      </ol>
+    </section>
+
+    <section aria-labelledby="export-title" className="grid gap-6 rounded-md border border-rule bg-sheet p-5 md:grid-cols-2">
+      <VoicePicker voices={voices} supported={supported} lang={timeline.lang} voiceURI={preferredVoice} onChange={setPreferredVoice} disabled={recording} />
+      <div className="flex flex-col gap-3">
+        <h3 id="export-title" className="text-sm font-semibold text-ink">Downloads</h3>
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" leftIcon={<Glyph name="download" />} onClick={() => downloadBlob(new Blob([subtitlesToVtt(timeline.subtitles)], { type: 'text/vtt;charset=utf-8' }), `story-${timeline.lang}.vtt`)}>
+            Subtitles (.vtt)
+          </Button>
+          {recording
+            ? <Button size="sm" variant="danger" leftIcon={<Glyph name="stop" />} onClick={() => {
+                recorder.current?.cancel(); recorder.current = null; releaseCanvas(); setRecording(false); setPreparing(false); player.pause();
+              }}>Cancel recording</Button>
+            : <Button size="sm" disabled={!canRecord || !imagesReady} leftIcon={<Glyph name="record" className="text-mark" />} onClick={startRecording}>
+                Record silent video
+              </Button>}
+          {video && <Button size="sm" variant="primary" leftIcon={<Glyph name="download" />} onClick={() => downloadBlob(video, `story-${timeline.lang}.${video.type.includes('mp4') ? 'mp4' : 'webm'}`)}>
+            Save video
+          </Button>}
+        </div>
+        <p className="text-[13px] leading-snug text-ink-2">
+          {canRecord
+            ? 'Recording plays the story from the start in real time. The file includes the pictures, the character, and subtitles if they are on — narration is heard here but is not saved in the file.'
+            : 'Video recording is unavailable in this browser. You can still download the subtitle track.'}
+        </p>
+        {recording && <div role="status" className="flex flex-col gap-1.5 text-[13px] font-medium text-ink">
+          <p className="tnum">{preparing ? 'Preparing to record' : player.playing ? 'Recording' : 'Recording paused'} · {formatTime(player.time)} / {formatTime(timeline.totalMs)}</p>
+          <div role="progressbar" aria-label="Recording progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(recordPct * 100)} className="h-1 bg-ink/10">
+            <div className="h-full origin-left bg-mark" style={{ transform: `scaleX(${recordPct})` }} />
+          </div>
+        </div>}
+        {video && <p role="status" className="text-[13px] font-medium text-ok">Your silent video is ready to save.</p>}
+        {exportError && <p role="alert" className="text-[13px] text-bad">{exportError}</p>}
+      </div>
+    </section>
   </div>;
 }

@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, MotionConfig } from 'framer-motion';
-import { TopBar } from './panels/TopBar';
+import { TopBar, type Mode } from './panels/TopBar';
 import { LandScreen } from './panels/LandScreen';
-import { PromptForm } from './panels/PromptForm';
+import { PromptForm, SHOT_INPUT_ID } from './panels/PromptForm';
 import { DraftGrid } from './panels/DraftGrid';
 import { Stage } from './panels/Stage';
 import { VersionRail } from './panels/VersionRail';
-import { CommandPalette } from './panels/CommandPalette';
 import { Toaster } from './components/Toaster';
+import { Kbd } from './components/ui';
 import { useHotkeys } from './hooks/useHotkeys';
 import {
   actions,
@@ -30,8 +30,7 @@ export function App() {
   const err = useStoreError();
   const avail = useAvailableCredits();
 
-  const [paletteOpen, setPaletteOpen] = useState(false);
-  const [mode, setMode] = useState<'takes' | 'story'>('takes');
+  const [mode, setMode] = useState<Mode>('takes');
   const [focusId, setFocusId] = useState<string | null>(activeId);
 
   // Follow programmatic active changes: render/nudge/retry focus the new take;
@@ -51,6 +50,8 @@ export function App() {
 
   const inFocus = focusId !== null && activeTake !== null;
 
+  // Every action has a visible control; these keys are shortcuts to the same
+  // controls, listed under the work area — there is no hidden command list.
   const bindings = useMemo<Record<string, () => void>>(() => {
     if (mode === 'story') return {} as Record<string, () => void>;
     const navigate = (delta: number) => {
@@ -61,10 +62,8 @@ export function App() {
       select(ids[next]);
     };
     return {
-      'mod+k': () => setPaletteOpen((o) => !o),
       escape: () => {
-        if (paletteOpen) setPaletteOpen(false);
-        else if (inFocus) back();
+        if (inFocus && drafts.length > 0) back();
       },
       r: () => {
         if (
@@ -78,47 +77,49 @@ export function App() {
       m: () => {
         if (activeTake?.status === 'ready') {
           actions.remix(activeTake.id);
-          toast('Spun four variants.');
+          toast('Remixing: four new drafts are on the way.');
         }
       },
+      n: () => document.getElementById(SHOT_INPUT_ID)?.focus(),
       arrowleft: () => navigate(-1),
       arrowright: () => navigate(1),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, paletteOpen, inFocus, activeTake, avail, drafts, activeId]);
+  }, [mode, inFocus, activeTake, avail, drafts, activeId]);
 
   useHotkeys(bindings);
 
   return (
     <MotionConfig reducedMotion="user">
-      <div className="app-canvas min-h-full">
-        <TopBar onOpenPalette={() => setPaletteOpen(true)} showActions={mode === 'takes'} />
-        <nav aria-label="Workspace mode" className="mx-auto flex max-w-[1400px] gap-1 px-4 pt-4">
-          {(['takes', 'story'] as const).map((item) => (
-            <button key={item} aria-pressed={mode === item} onClick={() => { setMode(item); setPaletteOpen(false); }}
-              className={`cursor-pointer rounded-xl px-4 py-2 text-sm font-medium transition-colors ${mode === item ? 'bg-white/10 text-fg' : 'text-fg-muted hover:bg-white/5 hover:text-fg'}`}>
-              {item === 'takes' ? 'Takes' : 'Story studio'}
-            </button>
-          ))}
-        </nav>
+      <div className="min-h-full bg-paper text-ink">
+        <TopBar mode={mode} onModeChange={setMode} />
 
-        {mode === 'story' ? <ConnectedStoryMode /> : !hasTakes ? (
+        {mode === 'story' ? (
+          <ConnectedStoryMode />
+        ) : !hasTakes ? (
           <LandScreen />
         ) : (
-          <main className="mx-auto max-w-[1400px] px-4 py-5">
-            <div className="mb-5">
-              <PromptForm variant="bar" onSubmitted={() => setFocusId(null)} />
-            </div>
+          <main className="mx-auto max-w-[1400px] px-4 pb-16 pt-5 sm:px-6">
+            <section aria-label="New prompt" className="mb-6 rounded-md border border-rule bg-sheet p-4">
+              <PromptForm
+                variant="bar"
+                initialKind={drafts[0]?.intent.kind ?? activeTake?.intent.kind}
+                onSubmitted={() => setFocusId(null)}
+              />
+            </section>
 
-            <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
               <div className="min-w-0">
+                {/* Keyed per take: switching takes is a clean exit and entrance. Reusing one
+                    Stage across takes strands its shared-layout frame and stalls the exit. */}
                 <AnimatePresence mode="wait" initial={false}>
                   {inFocus && activeTake ? (
-                    <Stage key="stage" take={activeTake} onBack={back} showBack={drafts.length > 0} />
+                    <Stage key={`stage-${activeTake.id}`} take={activeTake} onBack={back} showBack={drafts.length > 0} />
                   ) : (
                     <DraftGrid key="grid" takes={drafts} activeId={activeId} onSelect={select} />
                   )}
                 </AnimatePresence>
+                <ShortcutList />
               </div>
 
               <VersionRail onSelect={select} />
@@ -126,9 +127,32 @@ export function App() {
           </main>
         )}
 
-        <CommandPalette open={mode === 'takes' && paletteOpen} onClose={() => setPaletteOpen(false)} />
         <Toaster />
       </div>
     </MotionConfig>
+  );
+}
+
+/** Plain, always-visible shortcut list for keyboard users (hidden on touch screens). */
+function ShortcutList() {
+  const keys: Array<[string[], string]> = [
+    [['←', '→'], 'move between drafts'],
+    [['Esc'], 'back to drafts'],
+    [['R'], 'render'],
+    [['M'], 'remix'],
+    [['N'], 'new prompt'],
+  ];
+  return (
+    <div className="mt-8 hidden flex-wrap items-center gap-x-5 gap-y-2 border-t border-rule pt-4 text-[13px] text-ink-2 [@media(hover:hover)_and_(pointer:fine)]:flex">
+      <span className="font-semibold text-ink">Keyboard</span>
+      {keys.map(([k, what]) => (
+        <span key={what} className="inline-flex items-center gap-1.5">
+          {k.map((key) => (
+            <Kbd key={key}>{key}</Kbd>
+          ))}
+          {what}
+        </span>
+      ))}
+    </div>
   );
 }

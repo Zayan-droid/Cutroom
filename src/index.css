@@ -2,80 +2,165 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   Theme tokens. Light "paper" is the default; dark is a warm graphite, chosen
+   from the toggle in the top bar (persisted, applied before paint in
+   index.html). Channels are "R G B" so Tailwind opacity modifiers work.
+   Contrast (WCAG): ink 15:1, ink-2 8:1, ink-3 ≥5:1 on paper/sheet; edge ≥3:1
+   for control boundaries; text on mark ≥5.4:1 in both themes.
+   ───────────────────────────────────────────────────────────────────────────── */
 @layer base {
-  :root {
+  :root,
+  [data-theme='light'] {
+    color-scheme: light;
+    --paper: 242 238 230;
+    --sheet: 250 248 243;
+    --well: 231 226 215;
+    --field: 255 253 248;
+    --ink: 26 24 20;
+    --ink-2: 74 69 61;
+    --ink-3: 98 92 81;
+    --edge: 140 132 120;
+    --rule: 217 210 197;
+    --mark: 191 58 16;
+    --on-mark: 255 255 255;
+    --ok: 46 107 64;
+    --warn: 133 86 0;
+    --bad: 163 34 26;
+  }
+
+  [data-theme='dark'] {
     color-scheme: dark;
+    --paper: 26 25 22;
+    --sheet: 34 32 28;
+    --well: 18 17 16;
+    --field: 18 17 16;
+    --ink: 238 233 223;
+    --ink-2: 188 181 167;
+    --ink-3: 150 143 129;
+    --edge: 120 113 106;
+    --rule: 55 52 47;
+    --mark: 240 106 62;
+    --on-mark: 26 25 22;
+    --ok: 124 196 142;
+    --warn: 226 174 85;
+    --bad: 242 139 124;
   }
 
   * {
-    border-color: theme('colors.border');
+    border-color: rgb(var(--rule));
   }
 
   html,
   body,
   #root {
-    height: 100%;
+    min-height: 100%;
   }
 
   body {
     margin: 0;
-    background-color: theme('colors.bg');
-    color: theme('colors.fg');
+    background-color: rgb(var(--paper));
+    color: rgb(var(--ink));
     font-family: theme('fontFamily.sans');
+    font-size: 16px;
+    line-height: 1.5;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
-    font-feature-settings: 'cv11', 'ss01';
   }
 
-  /* Numbers (credits, cost) align cleanly as they animate */
-  .tnum {
-    font-variant-numeric: tabular-nums;
-    font-feature-settings: 'tnum';
-  }
-
-  /* Visible focus for keyboard users; never removed. */
+  /* Visible focus for keyboard users; never removed. Ink, not the accent, so a
+     focused control is never confused with a selected one. */
   :focus-visible {
-    outline: 2px solid theme('colors.primary');
+    outline: 2px solid rgb(var(--ink));
     outline-offset: 2px;
-    border-radius: 6px;
   }
 
   ::selection {
-    background: rgba(236, 72, 153, 0.28);
+    background: rgb(var(--mark) / 0.22);
+  }
+
+  dialog::backdrop {
+    background: rgb(26 24 20 / 0.45);
+  }
+}
+
+@layer utilities {
+  /* Numbers (credits, cost, time) hold their width as they change. */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Archivo's width axis carries hierarchy instead of caps + tracking. */
+  .stretch-condensed {
+    font-stretch: 84%;
+  }
+  .stretch-wide {
+    font-stretch: 112%;
+  }
+
+  /* Comfortable hit areas on touch screens without bloating desktop density. */
+  @media (pointer: coarse) {
+    .tap {
+      min-height: 44px;
+      min-width: 44px;
+    }
+  }
+
+  .scroll-quiet {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(var(--edge) / 0.6) transparent;
   }
 }
 
 @layer components {
-  .app-canvas {
-    background-color: theme('colors.bg');
-    background-image: theme('backgroundImage.app-radial');
-  }
-
-  /* Film-grain overlay used on placeholder posters */
-  .grain::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    opacity: 0.14;
-    mix-blend-mode: overlay;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  }
-
-  .thin-scroll {
-    scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
-  }
-  .thin-scroll::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-  }
-  .thin-scroll::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.14);
-    border-radius: 999px;
-  }
-  .thin-scroll::-webkit-scrollbar-track {
+  /* Range input used as a scrubber: ink track, accent fill up to --pct. */
+  .scrubber {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 24px;
     background: transparent;
+    cursor: pointer;
+  }
+  .scrubber:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+  .scrubber::-webkit-slider-runnable-track {
+    height: 4px;
+    background: linear-gradient(
+      to right,
+      rgb(var(--mark)) var(--pct, 0%),
+      rgb(var(--ink) / 0.2) var(--pct, 0%)
+    );
+  }
+  .scrubber::-moz-range-track {
+    height: 4px;
+    background: rgb(var(--ink) / 0.2);
+  }
+  .scrubber::-moz-range-progress {
+    height: 4px;
+    background: rgb(var(--mark));
+  }
+  .scrubber::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 4px;
+    height: 18px;
+    margin-top: -7px;
+    border: 0;
+    border-radius: 1px;
+    background: rgb(var(--ink));
+  }
+  .scrubber::-moz-range-thumb {
+    width: 4px;
+    height: 18px;
+    border: 0;
+    border-radius: 1px;
+    background: rgb(var(--ink));
+  }
+  .scrubber:focus-visible {
+    outline-offset: 4px;
   }
 }
 
