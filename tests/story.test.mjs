@@ -4,6 +4,7 @@ import { buildTimeline, createStoryEngine } from '../src/story/storyEngine.ts';
 import { toVtt } from '../src/story/subtitles.ts';
 import { LANGUAGES } from '../src/story/localize.ts';
 import { selectVoice } from '../src/story/voices.ts';
+import { extractSubject } from '../src/story/grammar.ts';
 import { createStoryStore } from '../src/store/storyStore.ts';
 
 const prompt = 'a lonely lighthouse keeper';
@@ -220,4 +221,18 @@ test('a forced failure in the store surfaces an error and never charges credits'
   assert.equal(store.getState().timeline.status, 'failed');
   assert.equal(store.getState().credits, 100, 'a failed story is free');
   assert.equal(store.getState().lastError?.code, 'engine-error');
+});
+
+test('extractSubject finds the hero noun phrase, so titles and narration read as whole phrases', () => {
+  assert.equal(extractSubject('A young lighthouse keeper follows a wandering star and finds her way home.'), 'the young lighthouse keeper');
+  assert.equal(extractSubject('In a small village by the sea, an old fisherman discovers a message'), 'the old fisherman');
+  assert.equal(extractSubject('Mira, a lighthouse keeper, climbs the tower'), 'Mira');
+  assert.equal(extractSubject('Two brothers build a raft to cross the river'), 'two brothers');
+  assert.equal(extractSubject('robot learns to paint'), 'the robot');
+  assert.equal(extractSubject('a lonely lighthouse keeper'), 'the lonely lighthouse keeper');
+  assert.equal(extractSubject('   '), 'the hero');
+  // Other languages get the bare phrase; their templates supply the grammar.
+  assert.equal(extractSubject('A young lighthouse keeper follows a star', 'es-ES'), 'young lighthouse keeper');
+  const title = buildTimeline({ prompt: 'A young lighthouse keeper follows a wandering star and finds her way home.', lang: 'en-US' }, { idPrefix: 't' }).title;
+  assert.equal(title, 'The Story of the young lighthouse keeper');
 });
