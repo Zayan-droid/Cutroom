@@ -1,17 +1,12 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { cn } from '@/lib/cn';
-import { aspectFor } from '@/lib/media';
+import { aspectFor, isVideoAsset } from '@/lib/media';
 import { tLayout } from '@/lib/motion';
 import { takeAsset } from '@/lib/download';
 import type { Take } from '@/types';
 import { Button } from './ui';
 import { Glyph } from './Glyph';
-
-/** Remote renders return video clips; remote drafts (and some stills) are images. */
-function isVideoAsset(url: string): boolean {
-  return /\.(mp4|webm|mov|m4v)(\?.*)?$/i.test(url) || url.startsWith('data:video') || url.startsWith('blob:');
-}
 
 export function clipTime(seconds: number): string {
   const s = Number.isFinite(seconds) ? Math.max(0, Math.floor(seconds)) : 0;

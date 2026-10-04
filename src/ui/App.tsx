@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, MotionConfig } from 'framer-motion';
 import { TopBar, type Mode } from './panels/TopBar';
 import { LandScreen } from './panels/LandScreen';
 import { PromptForm, SHOT_INPUT_ID } from './panels/PromptForm';
 import { DraftGrid } from './panels/DraftGrid';
 import { Stage } from './panels/Stage';
+import { EditStage } from './panels/EditStage';
 import { VersionRail } from './panels/VersionRail';
 import { Toaster } from './components/Toaster';
 import { Kbd } from './components/ui';
@@ -21,6 +22,10 @@ import {
 import { toast } from '@/store/toast';
 import { quote } from '@/lib/cost';
 import { ConnectedStoryMode } from './story/ConnectedStoryMode';
+import { EditWorkspace, type EditTarget } from './edit/EditWorkspace';
+import { cloneRecipe, createRecipe } from '@/edit/recipe';
+import { takeAsset } from '@/lib/download';
+import type { EditRecipe, Take } from '@/types';
 
 export function App() {
   const hasTakes = useHasTakes();
@@ -32,6 +37,37 @@ export function App() {
 
   const [mode, setMode] = useState<Mode>('takes');
   const [focusId, setFocusId] = useState<string | null>(activeId);
+  // The editor's open clip and unsaved recipe live here, so switching tabs never loses them.
+  const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
+
+  const openEditor = useCallback((take: Take) => {
+    if (!takeAsset(take)) return;
+    setEditTarget((current) => {
+      if (current?.source.kind === 'take' && current.source.takeId === take.id) return current;
+      const recipe = take.kind === 'edit' && take.edit ? cloneRecipe(take.edit) : createRecipe();
+      return { source: { kind: 'take', takeId: take.id }, recipe, base: cloneRecipe(recipe) };
+    });
+    setMode('edit');
+    window.scrollTo({ top: 0 });
+  }, []);
+
+  // A saved edit opens on the stage as the newest version (the store made it active).
+  const onEditSaved = useCallback((id: string) => {
+    const saved = useProjectStore.getState().takes.find((t) => t.id === id);
+    const recipe = saved?.edit ? cloneRecipe(saved.edit) : createRecipe();
+    setEditTarget({ source: { kind: 'take', takeId: id }, recipe, base: cloneRecipe(recipe) });
+    setMode('takes');
+    window.scrollTo({ top: 0 });
+    toast('Saved as a new version in your history.', 'success');
+  }, []);
+
+  // Release a computer file's object URL once the editor moves on from it.
+  const fileUrl = editTarget?.source.kind === 'file' ? editTarget.source.url : null;
+  const lastFileUrl = useRef<string | null>(null);
+  useEffect(() => {
+    if (lastFileUrl.current && lastFileUrl.current !== fileUrl) URL.revokeObjectURL(lastFileUrl.current);
+    lastFileUrl.current = fileUrl;
+  }, [fileUrl]);
 
   // Follow programmatic active changes: render/nudge/retry focus the new take;
   // submit/remix clear it (activeId → null) so the draft grid shows.
@@ -53,7 +89,7 @@ export function App() {
   // Every action has a visible control; these keys are shortcuts to the same
   // controls, listed under the work area — there is no hidden command list.
   const bindings = useMemo<Record<string, () => void>>(() => {
-    if (mode === 'story') return {} as Record<string, () => void>;
+    if (mode !== 'takes') return {} as Record<string, () => void>;
     const navigate = (delta: number) => {
       if (drafts.length === 0) return;
       const ids = drafts.map((d) => d.id);
@@ -81,11 +117,14 @@ export function App() {
         }
       },
       n: () => document.getElementById(SHOT_INPUT_ID)?.focus(),
+      e: () => {
+        if (activeTake && takeAsset(activeTake)) openEditor(activeTake);
+      },
       arrowleft: () => navigate(-1),
       arrowright: () => navigate(1),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, inFocus, activeTake, avail, drafts, activeId]);
+  }, [mode, inFocus, activeTake, avail, drafts, activeId, openEditor]);
 
   useHotkeys(bindings);
 
@@ -96,6 +135,8 @@ export function App() {
 
         {mode === 'story' ? (
           <ConnectedStoryMode />
+        ) : mode === 'edit' ? (
+          <EditWorkspace target={editTarget} onTarget={setEditTarget} onPickTake={openEditor} onSaved={onEditSaved} />
         ) : !hasTakes ? (
           <LandScreen />
         ) : (
@@ -114,7 +155,18 @@ export function App() {
                     Stage across takes strands its shared-layout frame and stalls the exit. */}
                 <AnimatePresence mode="wait" initial={false}>
                   {inFocus && activeTake ? (
-                    <Stage key={`stage-${activeTake.id}`} take={activeTake} onBack={back} showBack={drafts.length > 0} />
+                    activeTake.kind === 'edit' && activeTake.edit ? (
+                      <EditStage
+                        key={`stage-${activeTake.id}`}
+                        take={activeTake as Take & { edit: EditRecipe }}
+                        onBack={back}
+                        showBack={drafts.length > 0}
+                        onEdit={openEditor}
+                        onSelect={select}
+                      />
+                    ) : (
+                      <Stage key={`stage-${activeTake.id}`} take={activeTake} onBack={back} showBack={drafts.length > 0} onEdit={openEditor} />
+                    )
                   ) : (
                     <DraftGrid key="grid" takes={drafts} activeId={activeId} onSelect={select} />
                   )}
@@ -140,6 +192,7 @@ function ShortcutList() {
     [['Esc'], 'back to drafts'],
     [['R'], 'render'],
     [['M'], 'remix'],
+    [['E'], 'edit video'],
     [['N'], 'new prompt'],
   ];
   return (

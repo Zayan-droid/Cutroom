@@ -9,7 +9,8 @@ import { RecoverySurface } from './RecoverySurface';
 import { actions, useAvailableCredits } from '@/store';
 import { toast } from '@/store/toast';
 import { quote } from '@/lib/cost';
-import { ratioLabel } from '@/lib/media';
+import { isVideoAsset, ratioLabel } from '@/lib/media';
+import { takeAsset } from '@/lib/download';
 import { fadeUp, tBase } from '@/lib/motion';
 import { cn } from '@/lib/cn';
 
@@ -26,18 +27,28 @@ const FRAME_LIMIT: Record<IntentKind, { px: number; ratio: number; reserve: numb
   cinematic: { px: 960, ratio: 16 / 9, reserve: 420 },
 };
 
-function frameWidth({ px, ratio, reserve }: (typeof FRAME_LIMIT)[IntentKind]): string {
+export function frameWidth({ px, ratio, reserve }: (typeof FRAME_LIMIT)[IntentKind]): string {
   return `min(${px}px, calc(max(240px, 100vh - ${reserve}px) * ${ratio.toFixed(4)}))`;
+}
+
+/** The same caps for any shape (edited takes can be reframed to any of them). */
+export function frameLimitFor(aspect: number): (typeof FRAME_LIMIT)[IntentKind] {
+  if (aspect >= 1.2) return { ...FRAME_LIMIT.cinematic, ratio: aspect };
+  if (aspect >= 0.7) return { ...FRAME_LIMIT.ad, ratio: aspect };
+  return { ...FRAME_LIMIT.social, ratio: aspect };
 }
 
 export function Stage({
   take,
   onBack,
   showBack,
+  onEdit,
 }: {
   take: Take;
   onBack: () => void;
   showBack: boolean;
+  /** Open this take in the editor. */
+  onEdit?: (take: Take) => void;
 }) {
   const avail = useAvailableCredits();
   const ready = take.status === 'ready';
@@ -49,6 +60,7 @@ export function Stage({
   const limit = FRAME_LIMIT[take.intent.kind];
   const wide = take.intent.kind === 'cinematic';
   const label = take.label ?? (isDraft ? 'Draft' : 'Render');
+  const asset = takeAsset(take);
 
   const promptBlock = (
     <div>
@@ -163,6 +175,13 @@ export function Stage({
                   Remix into 4 drafts
                   <ButtonCost cost={0} />
                 </Button>
+
+                {onEdit && asset && (
+                  <Button variant="secondary" size={wide ? 'lg' : 'md'} className={cn(wide && 'md:w-auto')} onClick={() => onEdit(take)}>
+                    {isVideoAsset(asset) ? 'Edit video' : 'Edit image'}
+                    <ButtonCost cost={0} />
+                  </Button>
+                )}
 
                 {isDraft && (
                   <DownloadTake take={take} label="Download draft" variant="quiet" size={wide ? 'lg' : 'md'} className={cn(wide && 'md:w-auto')} />

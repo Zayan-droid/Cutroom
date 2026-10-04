@@ -162,6 +162,30 @@
   .scrubber:focus-visible {
     outline-offset: 4px;
   }
+
+  /* Editor scrubber over the whole clip: the kept (trimmed) range reads darker
+     than the parts that are cut, and the played part of it takes the accent. */
+  .scrubber[data-range]::-webkit-slider-runnable-track {
+    background: linear-gradient(
+      to right,
+      rgb(var(--ink) / 0.1) 0 var(--start),
+      rgb(var(--mark)) var(--start) var(--pct),
+      rgb(var(--ink) / 0.38) var(--pct) var(--end),
+      rgb(var(--ink) / 0.1) var(--end) 100%
+    );
+  }
+  .scrubber[data-range]::-moz-range-track {
+    background: linear-gradient(
+      to right,
+      rgb(var(--ink) / 0.1) 0 var(--start),
+      rgb(var(--mark)) var(--start) var(--pct),
+      rgb(var(--ink) / 0.38) var(--pct) var(--end),
+      rgb(var(--ink) / 0.1) var(--end) 100%
+    );
+  }
+  .scrubber[data-range]::-moz-range-progress {
+    background: transparent;
+  }
 }
 
 /* Honor the OS "reduce motion" setting everywhere as a safety net.

@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useRail, type RailEntry } from '@/store';
 import { Cost, Status } from '@/ui/components/ui';
+import { summarizeRecipe } from '@/edit/recipe';
 import { slideIn } from '@/lib/motion';
 import { cn } from '@/lib/cn';
 
@@ -17,7 +18,9 @@ function Branch({ depth }: { depth: number }) {
 
 function RailRow({ entry, index, onSelect }: { entry: RailEntry; index: number; onSelect: (id: string) => void }) {
   const { take, depth, isActive, isAncestor } = entry;
-  const label = take.label ?? (take.kind === 'render' ? 'Render' : 'Draft');
+  const label = take.label ?? (take.kind === 'render' ? 'Render' : take.kind === 'edit' ? 'Edit' : 'Draft');
+  const kindWords = take.kind === 'render' ? 'final render' : take.kind === 'edit' ? 'edited version' : 'draft';
+  const summary = take.kind === 'edit' && take.edit ? summarizeRecipe(take.edit) : null;
   return (
     // No `layout` animation here: the panel is position: sticky, and layout
     // measurements taken while the page is scrolled leave rows offset.
@@ -26,7 +29,7 @@ function RailRow({ entry, index, onSelect }: { entry: RailEntry; index: number; 
         type="button"
         onClick={() => onSelect(take.id)}
         aria-current={isActive ? 'true' : undefined}
-        aria-label={`${label}, ${take.kind === 'render' ? 'final render' : 'draft'}, ${take.status}${isActive ? ', current' : ''}`}
+        aria-label={`${label}, ${kindWords}, ${summary ?? take.status}${isActive ? ', current' : ''}`}
         className={cn(
           'relative flex w-full items-stretch gap-2 py-2 pl-3 pr-3 text-left transition-colors duration-150',
           isActive ? 'bg-mark/[0.08]' : 'hover:bg-ink/[0.04]',
@@ -44,8 +47,13 @@ function RailRow({ entry, index, onSelect }: { entry: RailEntry; index: number; 
           >
             {label}
             {take.kind === 'render' && <span className="font-normal text-ink-3"> · final</span>}
+            {take.kind === 'edit' && <span className="font-normal text-ink-3"> · edited</span>}
           </span>
-          <Status status={take.status} progress={take.progress} />
+          {summary ? (
+            <span className="block truncate text-[13px] font-medium text-ink-2">{summary}</span>
+          ) : (
+            <Status status={take.status} progress={take.progress} />
+          )}
         </span>
         {take.kind === 'render' && take.cost > 0 && <Cost cost={take.cost} className="shrink-0 pt-px text-[13px] text-ink-2" />}
       </button>

@@ -8,11 +8,13 @@ import { useTheme, type Theme } from '@/ui/hooks/useTheme';
 import { cn } from '@/lib/cn';
 import { tQuick } from '@/lib/motion';
 
-export type Mode = 'takes' | 'story';
+export type Mode = 'takes' | 'edit' | 'story';
 
-const MODES: Array<{ id: Mode; label: string }> = [
-  { id: 'takes', label: 'Video takes' },
-  { id: 'story', label: 'Story studio' },
+// Short names below 1024px keep three tabs, the credits, and the theme switch on screen at 320px.
+const MODES: Array<{ id: Mode; label: string; short: string }> = [
+  { id: 'takes', label: 'Video takes', short: 'Takes' },
+  { id: 'edit', label: 'Edit video', short: 'Edit' },
+  { id: 'story', label: 'Story studio', short: 'Story' },
 ];
 
 export function TopBar({ mode, onModeChange }: { mode: Mode; onModeChange: (mode: Mode) => void }) {
@@ -32,13 +34,15 @@ export function TopBar({ mode, onModeChange }: { mode: Mode; onModeChange: (mode
                 key={m.id}
                 type="button"
                 aria-current={mode === m.id ? 'page' : undefined}
+                aria-label={m.label}
                 onClick={() => onModeChange(m.id)}
                 className={cn(
                   'tap relative h-11 px-2 text-[15px] font-semibold transition-colors md:h-14',
                   mode === m.id ? 'text-ink' : 'text-ink-3 hover:text-ink',
                 )}
               >
-                {m.label}
+                <span className="lg:hidden">{m.short}</span>
+                <span className="hidden lg:inline">{m.label}</span>
                 {mode === m.id && <span aria-hidden className="absolute inset-x-2 bottom-0 h-[3px] bg-ink" />}
               </button>
             ))}
@@ -60,12 +64,14 @@ function CreditReadout({ mode }: { mode: Mode }) {
   const takeCredits = useCredits();
   const takeAvailable = useAvailableCredits();
   const storyCredits = useStoryStore((s) => s.credits);
-  const available = mode === 'takes' ? takeAvailable : storyCredits;
-  const held = mode === 'takes' ? takeCredits - takeAvailable : 0;
+  // Edits are part of the takes project, so the edit tab shows the same balance.
+  const story = mode === 'story';
+  const available = story ? storyCredits : takeAvailable;
+  const held = story ? 0 : takeCredits - takeAvailable;
 
   return (
     <div className="flex items-baseline gap-1.5" aria-live="polite">
-      <span className="text-sm text-ink-2">{mode === 'takes' ? 'Credits' : 'Story credits'}</span>
+      <span className="text-sm text-ink-2">{story ? 'Story credits' : 'Credits'}</span>
       <span className="relative inline-block min-w-[2ch] overflow-hidden text-right">
         <AnimatePresence initial={false} mode="popLayout">
           <motion.span
