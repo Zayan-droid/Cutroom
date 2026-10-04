@@ -9,8 +9,8 @@ import { INTENT_LABELS, type IntentKind, type Take } from '@/types';
 
 // Bundled demo clips — the same full-resolution renders the offline engine plays back.
 const SAMPLES: Record<IntentKind, { url: string; scene: string }> = {
-  social: { url: new URL('../../assets/social-1-render.mp4', import.meta.url).href, scene: 'Shoreline from above' },
-  ad: { url: new URL('../../assets/ad-3-render.mp4', import.meta.url).href, scene: 'Watch on marble' },
+  social: { url: new URL('../../assets/social-3-render.mp4', import.meta.url).href, scene: 'Alpine lake' },
+  ad: { url: new URL('../../assets/ad-2-render.mp4', import.meta.url).href, scene: 'Amber dropper bottle' },
   cinematic: { url: new URL('../../assets/cinematic-2-render.mp4', import.meta.url).href, scene: 'Coastline' },
 };
 
