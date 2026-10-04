@@ -56,10 +56,17 @@ npm run dev
 Then open the Vite URL it prints. The app seeds a session with 120 simulated
 credits and runs entirely against the bundled mock engine.
 
-### Mock engine configuration (optional)
+### Engine configuration (optional)
 
-Copy [`.env.example`](.env.example) to `.env.local` to control the demo engine's
-seed, outcome (random / success / failure), and timing. Restart Vite to apply.
+Add a `.env.local` to control the demo engine's seed, outcome, and timing —
+`VITE_MOCK_ENGINE_SEED`, `VITE_MOCK_ENGINE_OUTCOME` (`random` / `success` /
+`failure`), and `VITE_MOCK_ENGINE_TIME_SCALE`. The story engine takes the same
+three knobs under `VITE_STORY_ENGINE_*`. Restart Vite to apply.
+
+By default the app runs fully offline on the bundled mock engine. To point it at
+a real backend instead, set `VITE_USE_REMOTE_ENGINE=true` and `VITE_API_BASE` to
+the backend URL; leave it `false` for the mock engine, which always works. No
+API keys live in this frontend bundle — it ships to the browser.
 
 ## Scripts
 

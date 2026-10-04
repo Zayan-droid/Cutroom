@@ -58,8 +58,8 @@ included) and is what the tests assert against.
 
 ## Reproducible QA and demos
 
-The app singleton reads optional Vite env vars — copy `.env.example` to
-`.env.local`, set `VITE_STORY_ENGINE_SEED`, `VITE_STORY_ENGINE_OUTCOME`, and
+The app singleton reads optional Vite env vars — in a `.env.local`, set
+`VITE_STORY_ENGINE_SEED`, `VITE_STORY_ENGINE_OUTCOME`, and
 `VITE_STORY_ENGINE_TIME_SCALE`, then restart Vite. Factory-created instances use
 their explicit options and ignore the environment. `timeScale: 0` is allowed and
 still delivers asynchronously.

@@ -50,8 +50,8 @@ sessions cannot collide with persisted takes. `timeScale: 0` is allowed and stil
 uses asynchronous callbacks. Retrying through a forced-failure engine will fail
 again; use a success instance for a scripted recovery.
 
-The app singleton reads optional Vite environment variables. Copy `.env.example`
-to `.env.local`, set `VITE_MOCK_ENGINE_SEED`, `VITE_MOCK_ENGINE_OUTCOME`, and
+The app singleton reads optional Vite environment variables. In a `.env.local`,
+set `VITE_MOCK_ENGINE_SEED`, `VITE_MOCK_ENGINE_OUTCOME`, and
 `VITE_MOCK_ENGINE_TIME_SCALE`, then restart Vite. Without configuration it uses
 fresh randomness, ordinary timing, and the 1/8 failure rate. Factory-created
 instances use their explicit options and do not read environment variables.
