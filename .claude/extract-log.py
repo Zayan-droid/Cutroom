@@ -366,7 +366,7 @@ def main():
 
     session_stats = calculate_session_stats(entries)
 
-    output_dir = cwd / '.claude-logs'
+    output_dir = cwd / '.agent-logs'
     output_dir.mkdir(parents=True, exist_ok=True)
 
     existing_files = list(output_dir.glob(f"*_{session_id}.md"))

@@ -19,12 +19,14 @@ npm test            # node --test, all suites must pass
 
 ## Session Logs
 
-Always commit `.claude-logs/` with your changes.
+Always commit `.agent-logs/` with your changes.
 
 Session capture is the official 8x agent-capture setup: `UserPromptSubmit` and
 `Stop` hooks in `~/.claude/settings.json` run `~/.claude/extract-log.py` (a copy
 lives in [`.claude/extract-log.py`](.claude/extract-log.py)), which writes a
-redacted prompt+response digest to `.claude-logs/<timestamp>_<session>.md`. Only
+redacted prompt+response digest to `.agent-logs/<timestamp>_<session>.md`. Only
 user prompts and final assistant text are kept — never tool calls, diffs, or
-secrets. `.claude-logs/` is the canonical directory for every agent; do not
-rename it or add it to `.gitignore`.
+secrets. `.agent-logs/` is the directory the assignment brief requires, checked
+at the repo root; it is canonical for every agent. Do not rename it (it was once
+`.claude-logs/`; the hiring reviewer looks for `.agent-logs/`) or add it to
+`.gitignore`.
