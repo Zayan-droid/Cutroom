@@ -1,227 +1,142 @@
-# Design System Master File
+# Cutroom design system — master
 
-> **LOGIC:** When building a specific page, first check `design-system/pages/[page-name].md`.
-> If that file exists, its rules **override** this Master file.
-> If not, strictly follow the rules below.
+> **Logic:** when building a page, first check `design-system/cutroom/pages/<page>.md`.
+> If it exists, its rules override this file. Otherwise follow this file.
 
----
-
-**Project:** Cutroom
-**Generated:** 2026-09-30 17:16:16
-**Category:** AI Photo & Avatar Generator
-**Design Dials:** Variance 5/10 (Balanced / Modern) | Motion 8/10 (Complex) | Density 6/10 (Standard)
+**Revised:** 2026-10-04. Replaces the generated 2026-09-30 "Modern Dark (Cinema)" master.
+**Implemented in:** `tailwind.config.js` (token names), `src/index.css` (token values, both
+themes), `src/ui/components/*` (primitives).
 
 ---
 
-## Global Rules
+## Direction
 
-### Color Palette
+A working edit room, not an AI landing page. The footage is the brightest, most colorful
+thing on screen; the interface around it is paper, ink, and one accent. Structure comes
+from type, alignment, and hairline rules — not from glow, blur, or gradients. Every
+control says what it does and what it costs in plain words.
 
-| Role | Hex | CSS Variable |
-|------|-----|--------------|
-| Primary | `#EC4899` | `--color-primary` |
-| On Primary | `#FFFFFF` | `--color-on-primary` |
-| Secondary | `#DB2777` | `--color-secondary` |
-| Accent/CTA | `#2563EB` | `--color-accent` |
-| Background | `#0F172A` | `--color-background` |
-| Foreground | `#FFFFFF` | `--color-foreground` |
-| Muted | `#201A32` | `--color-muted` |
-| Border | `rgba(255,255,255,0.08)` | `--color-border` |
-| Destructive | `#DC2626` | `--color-destructive` |
-| Ring | `#EC4899` | `--color-ring` |
+The ui-ux-pro-max search matched the right *style* families (E-Ink/Paper, Swiss
+Modernism 2.0) but its default palette for this product category was the violet + pink
+"AI generation" pair, so the palette below is a deliberate override.
 
-**Color Notes:** Video pink on dark + timeline blue
+## What this system rejects
 
-### Typography
+| Rejected pattern | Use instead |
+| --- | --- |
+| Near-black navy as the only theme | Light "paper" default; optional warm-graphite dark theme, chosen in the top bar and remembered |
+| Violet → pink/fuchsia gradient accent | One flat accent (`mark`, vermilion) for the primary action and selection only; no gradients anywhere in chrome |
+| Gradient-filled headline word | Plain, direct titles ("Start a video") set in Archivo; hierarchy from size and width |
+| Glassmorphism, `white/[0.03]` fills, hairline white borders | Opaque surfaces (`paper`, `sheet`, `well`); `rule` hairlines; `edge` (3:1) for control borders |
+| Lucide thin-line icons everywhere | No icon library. A small solid glyph set (`Glyph.tsx`) only where a symbol is the convention: transport, download, back, reroll, check |
+| Centered "Describe what you want…" hero | Left-aligned composer with labeled fields, beside a clearly labeled sample clip and a cost explanation |
+| Pill chips for options / "Try:" | Native radio groups drawn as joined rectangles (format picker shows the true frame ratio); examples as underlined text buttons; nudges as rectangular buttons |
+| Gradient CTA with ✨ | Solid `mark` button with a verb and its price: "Generate 4 drafts \| Free", "Render final \| 8 credits" |
+| ⌘K "Search actions" palette | Every action is a visible control where it applies; plain shortcuts listed under the work area (← →, Esc, R, M, N) |
+| Grain, ambient blobs, shimmer skeletons, uppercase micro-labels | Flat surfaces; determinate progress (big percentage + bar from real engine progress); sentence-case labels ≥13px |
 
-- **Heading Font:** Inter
-- **Body Font:** Inter
-- **Mood:** dark, cinematic, technical, precision, clean, premium, developer, professional, high-end utility
-- **Google Fonts:** [Inter + Inter](https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap)
+Also avoid: Inter, `rounded-2xl` everything, glow shadows, emoji, decorative overlays on
+footage (grain, vignette, play badges), and "costume" swaps (film sprockets, monospace
+labels, oversized editorial whitespace).
 
-**CSS Import:**
-```css
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-```
+## Color tokens
 
-### Spacing Variables
+Values are `R G B` channels on `:root` / `[data-theme]` so Tailwind opacity modifiers work
+(`bg-ink/10`). Never use raw hex in components — except media-plate colors burned into
+story frames and subtitles, which must not change with the UI theme.
 
-*Density: 6/10 — Standard*
+| Token | Light | Dark (graphite) | Role |
+| --- | --- | --- | --- |
+| `paper` | `#F2EEE6` | `#1A1916` | Page background |
+| `sheet` | `#FAF8F3` | `#22201C` | Panels, composer, toolbars |
+| `well` | `#E7E2D7` | `#121110` | Media surround, progress frames |
+| `field` | `#FFFDF8` | `#121110` | Text inputs, selects |
+| `ink` | `#1A1814` | `#EEE9DF` | Primary text, strong rules, focus ring |
+| `ink-2` | `#4A453D` | `#BCB5A7` | Secondary text |
+| `ink-3` | `#625C51` | `#968F81` | Tertiary text (still ≥5:1) |
+| `edge` | `#8C8478` | `#78716A` | Control boundaries (≥3:1) |
+| `rule` | `#D9D2C5` | `#37342F` | Decorative hairlines |
+| `mark` | `#BF3A10` | `#F06A3E` | The accent: primary action, current selection, scrubber fill |
+| `on-mark` | `#FFFFFF` | `#1A1916` | Text on `mark` (5.5:1 / 5.7:1) |
+| `ok` / `warn` / `bad` | `#2E6B40` / `#855600` / `#A3221A` | `#7CC48E` / `#E2AE55` / `#F28B7C` | Ready, held credits, failures |
 
-| Token | Value | Usage |
-|-------|-------|-------|
-| `--space-xs` | `4px` / `0.25rem` | Tight gaps |
-| `--space-sm` | `8px` / `0.5rem` | Icon gaps, inline spacing |
-| `--space-md` | `16px` / `1rem` | Standard padding |
-| `--space-lg` | `24px` / `1.5rem` | Section padding |
-| `--space-xl` | `32px` / `2rem` | Large gaps |
-| `--space-2xl` | `48px` / `3rem` | Section margins |
-| `--space-3xl` | `64px` / `4rem` | Hero padding |
+Measured contrast: `ink` 15:1, `ink-2` ≥7:1, `ink-3` ≥5:1 on every surface; `mark` text
+≥4.7:1 on `paper`/`sheet`. Status is never color alone — words plus an empty / half / full
+square.
 
-### Shadow Depths
+## Typography
 
-| Level | Value | Usage |
-|-------|-------|-------|
-| `--shadow-sm` | `0 1px 2px rgba(0,0,0,0.05)` | Subtle lift |
-| `--shadow-md` | `0 4px 6px rgba(0,0,0,0.1)` | Cards, buttons |
-| `--shadow-lg` | `0 10px 15px rgba(0,0,0,0.1)` | Modals, dropdowns |
-| `--shadow-xl` | `0 20px 25px rgba(0,0,0,0.15)` | Hero images, featured cards |
+- **Archivo** (variable `wdth` 62–125, `wght` 100–900) for all UI. Hierarchy comes from
+  weight and width: `.stretch-wide` (112%) for page titles and the wordmark,
+  `.stretch-condensed` (84%) for big progress numerals. Numbers that change use `.tnum`.
+- **Newsreader** (serif, variable optical size) only for words the user wrote or the
+  engine wrote for them: prompts, story ideas, story titles. It separates content from
+  chrome; it is not a decorative headline face.
+- Sizes: page title 32/40px bold; section 20px bold; body 16px; controls 15px; metadata
+  13px minimum. Labels are sentence case at 14px semibold — never tiny tracked caps.
 
----
+## Shape, surface, depth
 
-## Component Specs
+Radii 2–4px (`rounded-sm`, `rounded`, `rounded-md`); 0 on media frames. Panels are `sheet`
+with a 1px `rule` border. No shadows or blur on surfaces. The top bar has a solid ink rule
+underneath. Dialog backdrop is a flat ink scrim.
 
-### Buttons
+## Components (`src/ui/components`)
 
-```css
-/* Primary Button */
-.btn-primary {
-  background: #2563EB;
-  color: white;
-  padding: 12px 24px;
-  border-radius: 8px;
-  font-weight: 600;
-  transition: all 200ms ease;
-  cursor: pointer;
-}
+- **Button** — `primary` (mark), `secondary` (ink outline), `quiet` (text), `danger`.
+  Sizes sm 36 / md 44 / lg 48px; `.tap` lifts small targets to 44px on touch. Pressed state
+  is a 1px nudge, not a scale. Prices ride inside with `ButtonCost`.
+- **IntentSelector** — native radios (arrow keys work). Full variant shows name, ratio, and
+  render price; stacks on phones. Compact variant shows the ratio on phones, the name on
+  wider screens; both are announced in full.
+- **Status** — square glyph (empty queued, half generating, full ready/failed) + word,
+  with live percentage while generating.
+- **TakeFrame** — footage untouched. Thumbs crop to the format; the stage shows the whole
+  frame with real controls (play/pause, scrub, time, sound). States: progress (percentage
+  + bar), failed (hatched, "No picture"), no media, load error with "Try again". Reduced
+  motion: no autoplay, still accessible.
+- **Toaster** — solid ink notes bottom-left, `role=status`, tone strip on the left.
+- **ConfirmDialog** — native `<dialog>`; focus starts on Cancel; Esc cancels.
+- **Glyph** — play, pause, stop, record, restart, back, forward, download, retry, check,
+  plus, sound, muted; `BrandMark` is the trimmed-corner frame.
 
-.btn-primary:hover {
-  opacity: 0.9;
-  transform: translateY(-1px);
-}
+## Layout
 
-/* Secondary Button */
-.btn-secondary {
-  background: transparent;
-  color: #EC4899;
-  border: 2px solid #EC4899;
-  padding: 12px 24px;
-  border-radius: 8px;
-  font-weight: 600;
-  transition: all 200ms ease;
-  cursor: pointer;
-}
-```
+Container `max-w-[1400px]`, gutters 16px (phones) / 24px. Breakpoints used: 640 / 768 /
+1024 / 1280. Single-column grids are `grid-cols-1` so intrinsic widths can't cause
+horizontal scroll.
 
-### Cards
-
-```css
-.card {
-  background: #0F172A;
-  border-radius: 12px;
-  padding: 24px;
-  box-shadow: var(--shadow-md);
-  transition: all 200ms ease;
-  cursor: pointer;
-}
-
-.card:hover {
-  box-shadow: var(--shadow-lg);
-  transform: translateY(-2px);
-}
-```
-
-### Inputs
-
-```css
-.input {
-  padding: 12px 16px;
-  border: 1px solid #E2E8F0;
-  border-radius: 8px;
-  font-size: 16px;
-  transition: border-color 200ms ease;
-}
-
-.input:focus {
-  border-color: #EC4899;
-  outline: none;
-  box-shadow: 0 0 0 3px #EC489920;
-}
-```
-
-### Modals
-
-```css
-.modal-overlay {
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
-}
-
-.modal {
-  background: white;
-  border-radius: 16px;
-  padding: 32px;
-  box-shadow: var(--shadow-xl);
-  max-width: 500px;
-  width: 90%;
-}
-```
-
----
-
-## Style Guidelines
-
-**Style:** Modern Dark (Cinema Mobile)
-
-**Keywords:** dark mode, cinematic, ambient light, glassmorphism, deep black, indigo, glow, blur, atmospheric, reanimated, haptic, premium, layered, frosted glass, linear gradient
-
-**Best For:** Developer tools, pro productivity apps, fintech/trading dashboards, media/streaming platforms, AI tool interfaces, high-end gaming companion apps
-
-**Key Effects:** Expo.out Bezier(0.16,1,0.3,1) easing; spring modals (damping:20 stiffness:90); haptic-linked press (Impact Light/Medium); animated ambient light blobs (Reanimated translateX/Y slow oscillation); BlurView glassmorphism headers/nav (intensity 20); scale press 0.97 → 1.0; avoid pure #000000 (OLED smear)
-
-### Page Pattern
-
-**Pattern Name:** Video-First Hero
-
-- **Conversion Strategy:** 86% higher engagement with video. Add captions for accessibility. Compress video for performance.
-- **CTA Placement:** Overlay on video (center/bottom) + Bottom section
-- **Section Order:** 1. Hero with video background, 2. Key features overlay, 3. Benefits section, 4. CTA
-
----
+- **Opening screen:** title + one-line explanation; composer (7fr) beside sample clip and
+  the drafts/render/versions explanation (5fr); stacked on phones.
+- **Takes:** compact prompt row; work column + 320px version history (below on < 1024px).
+  Widescreen drafts are 2-up, tall formats 4-up.
+- **Stage:** picture first. Widescreen spans the column with actions directly below; tall
+  formats put actions beside the frame. Frame height is budgeted against the viewport so
+  "Render final" stays above the fold at 1280×800 and up.
 
 ## Motion
 
-**Page Transition** (Complex) — Trigger: route change | Duration: 500-800ms | Easing: `expo.inOut`
+One curve, `cubic-bezier(0.2, 0, 0, 1)`; 160ms exits, 240ms entrances, 320ms shared-frame
+moves. Motion explains state: drafts arrive in sequence, the chosen draft's frame grows
+into the stage, history rows slide in, the credit number rolls. No springs, bounces,
+looping decoration, or scale pops. `<MotionConfig reducedMotion="user">` plus a CSS safety
+net. Stages are keyed per take so every switch is a clean exit and entrance.
 
-```js
-const state = Flip.getState('.hero-image'); navigate(); Flip.from(state, { duration: 0.6, ease: 'expo.inOut', absolute: true, zIndex: 100 });
-```
+## Copy
 
-**Framework notes:** Requires the GSAP Flip plugin; the 'from' and 'to' route must render the same element with a shared data-flip-id
+Direct verbs and nouns: "Generate 4 drafts", "Render final", "Remix into 4 drafts",
+"Adjust and retry", "Reroll" (matches engine messages). State the price at the decision
+point and when it is charged ("Charged only when the render finishes"). No slogans, no
+internal terms (P1/P2, "palette shell").
 
-- ✅ Verify the shared element exists in both DOM states before calling Flip.from to avoid a silent no-op
-- ❌ Don't use shared-element transitions across more than one element pair per navigation; compounding Flips are hard to time correctly
-- ⚡ Flip recalculates layout (FLIP technique) so test on low-end devices for jank
+## Pre-delivery checklist
 
----
-
-## Anti-Patterns (Do NOT Use)
-
-- ❌ Inconsistent styling
-- ❌ Poor contrast ratios
-
-### Additional Forbidden Patterns
-
-- ❌ **Emojis as icons** — Use SVG icons (Heroicons, Lucide, Simple Icons)
-- ❌ **Missing cursor:pointer** — All clickable elements must have cursor:pointer
-- ❌ **Layout-shifting hovers** — Avoid scale transforms that shift layout
-- ❌ **Low contrast text** — Maintain 4.5:1 minimum contrast ratio
-- ❌ **Instant state changes** — Always use transitions (150-300ms)
-- ❌ **Invisible focus states** — Focus states must be visible for a11y
-
----
-
-## Pre-Delivery Checklist
-
-Before delivering any UI code, verify:
-
-- [ ] No emojis used as icons (use SVG instead)
-- [ ] All icons from consistent icon set (Heroicons/Lucide)
-- [ ] `cursor-pointer` on all clickable elements
-- [ ] Hover states with smooth transitions (150-300ms)
-- [ ] Light mode: text contrast 4.5:1 minimum
-- [ ] Focus states visible for keyboard navigation
-- [ ] `prefers-reduced-motion` respected
-- [ ] Responsive: 375px, 768px, 1024px, 1440px
-- [ ] No content hidden behind fixed navbars
-- [ ] No horizontal scroll on mobile
+- [ ] None of the rejected patterns above, in any state (failed, loading, dialogs, story).
+- [ ] Only tokens in components; both themes checked.
+- [ ] Text ≥4.5:1, control borders ≥3:1, focus ring visible (ink, 2px, offset).
+- [ ] Every action has a visible control and a plain label; prices shown before commit.
+- [ ] No nested interactive controls; native radios/dialog where they exist.
+- [ ] Touch targets ≥44px on coarse pointers; no hover-only information.
+- [ ] Reduced motion: no autoplay, no transforms; content still reachable.
+- [ ] No horizontal scroll at 320, 375, 768, 1024, 1440.
+- [ ] Footage shown without overlays; media errors are explicit and recoverable.

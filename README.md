@@ -82,9 +82,12 @@ branches; see [`CONTRIBUTING.md`](CONTRIBUTING.md) for the branch strategy.
 
 ## Tech stack
 
-React 18 · TypeScript · Vite · Tailwind CSS · Zustand · Framer Motion ·
-lucide-react. Tests run on the built-in `node --test` runner (Node 24+, which
-strips TypeScript types so the `.test.mjs` files import `.ts` sources directly).
+React 18 · TypeScript · Vite · Tailwind CSS · Zustand · Framer Motion. Type is
+Archivo (UI) and Newsreader (prompts and story text); icons are a small in-repo
+glyph set, and the visual rules live in
+[`design-system/cutroom/MASTER.md`](design-system/cutroom/MASTER.md). Tests run on
+the built-in `node --test` runner (Node 24+, which strips TypeScript types so the
+`.test.mjs` files import `.ts` sources directly).
 
 ## Project layout
 
