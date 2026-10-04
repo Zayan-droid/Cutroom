@@ -15,12 +15,12 @@ Core flow (all P0): **Land → describe → draft grid → pick → stage → re
 | Opening screen | `panels/LandScreen.tsx` | direct title, left-aligned composer, labeled sample clip per format, drafts/render/versions explained with real prices |
 | Prompt + format + details | `PromptForm.tsx`, `IntentSelector.tsx`, `PromptAssist.tsx` | full and compact composers, native-radio format picker drawn at true ratios, optional subject/look/camera/mood, worked examples |
 | Draft grid | `DraftGrid.tsx`, `DraftCard.tsx` | staggered reveal, status summary, one stretched button per card, separate free reroll for failed drafts |
-| Stage | `Stage.tsx` | full-frame playback with controls, Render (price before click), Remix, five adjustments; layout adapts to the format |
+| Stage | `Stage.tsx` | full-frame playback with controls, Render (price before click), Remix, five adjustments, downloads (final render and drafts); layout adapts to the format |
 | Recovery | `RecoverySurface.tsx` | plain failure message, free reroll, reroll with one change |
 | Version history | `VersionRail.tsx` | depth-first branch tree from `useRail()`, numbered rows, live enter/exit |
 | Media | `components/TakeFrame.tsx` | unprocessed footage; progress, failed, no-media, and load-error states; reduced-motion playback |
-| Primitives | `components/ui.tsx`, `Glyph.tsx`, `Toaster.tsx`, `ConfirmDialog.tsx`, `hooks/useTheme.ts` | buttons with inline prices, status squares, solid glyph set, toasts, native dialog, theme store |
-| Keyboard | `hooks/useHotkeys.ts` | Esc, R render, M remix, N new prompt, ←/→ move between drafts (paused while a dialog is open) |
+| Primitives | `components/ui.tsx`, `Glyph.tsx`, `Toaster.tsx`, `ConfirmDialog.tsx`, `DownloadTake.tsx`, `hooks/useTheme.ts` | buttons with inline prices, status squares, solid glyph set, toasts, native dialog, take downloads, theme store |
+| Keyboard | `hooks/useHotkeys.ts`, `lib/hotkeys.ts` | Esc, R render, M remix, N new prompt, ←/→ move between drafts. Matching is exact, so Ctrl/Cmd+R still refreshes; paused while a dialog is open |
 
 The ⌘K command palette was removed: its real actions already have visible controls, and its "effects & apps" entries were non-functional placeholders.
 

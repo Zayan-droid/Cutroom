@@ -97,6 +97,8 @@ underneath. Dialog backdrop is a flat ink scrim.
   motion: no autoplay, still accessible.
 - **Toaster** — solid ink notes bottom-left, `role=status`, tone strip on the left.
 - **ConfirmDialog** — native `<dialog>`; focus starts on Cancel; Esc cancels.
+- **DownloadTake** — saves a take's media as `cutroom-<prompt>-<version>.<ext>`; if the
+  browser can't fetch it, says so and offers the file directly.
 - **Glyph** — play, pause, stop, record, restart, back, forward, download, retry, check,
   plus, sound, muted; `BrandMark` is the trimmed-corner frame.
 
@@ -124,10 +126,10 @@ net. Stages are keyed per take so every switch is a clean exit and entrance.
 
 ## Copy
 
-Direct verbs and nouns: "Generate 4 drafts", "Render final", "Remix into 4 drafts",
-"Adjust and retry", "Reroll" (matches engine messages). State the price at the decision
-point and when it is charged ("Charged only when the render finishes"). No slogans, no
-internal terms (P1/P2, "palette shell").
+Direct verbs and nouns: "Generate 4 drafts", "Render final", "Download final render",
+"Remix into 4 drafts", "Adjust and retry", "Reroll" (matches engine messages). State the
+price at the decision point and when it is charged ("Charged only when the render
+finishes"). No slogans, no internal terms (P1/P2, "palette shell").
 
 ## Pre-delivery checklist
 
@@ -135,6 +137,7 @@ internal terms (P1/P2, "palette shell").
 - [ ] Only tokens in components; both themes checked.
 - [ ] Text ≥4.5:1, control borders ≥3:1, focus ring visible (ink, 2px, offset).
 - [ ] Every action has a visible control and a plain label; prices shown before commit.
+- [ ] Shortcuts match exactly: a bare key never fires with Ctrl/Cmd/Alt/Shift held.
 - [ ] No nested interactive controls; native radios/dialog where they exist.
 - [ ] Touch targets ≥44px on coarse pointers; no hover-only information.
 - [ ] Reduced motion: no autoplay, no transforms; content still reachable.
