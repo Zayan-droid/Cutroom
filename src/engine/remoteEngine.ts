@@ -6,7 +6,7 @@
 // On any backend error a take settles to 'failed' with a human message, so the
 // existing recovery surface (free reroll + nudges) handles outages gracefully.
 
-import type { Intent, Nudge, Take, TakeKind } from '../types.ts';
+import type { GenerationKind, Intent, Nudge, Take } from '../types.ts';
 import type { EngineUpdate, GenerationEngine } from './contract.ts';
 import { quote } from './cost.ts';
 import { getVideo, postImage, postVideo } from '../lib/apiClient.ts';
@@ -42,7 +42,7 @@ function sizeFor(kind: Intent['kind']): { width: number; height: number } {
   return { width: 768, height: 432 }; // 16:9 cinematic
 }
 
-function promptFor(intent: Intent, kind: TakeKind): string {
+function promptFor(intent: Intent, kind: GenerationKind): string {
   const bits = [intent.subject, intent.style, intent.motion, intent.mood]
     .map((s) => s?.trim())
     .filter(Boolean);
@@ -54,7 +54,7 @@ function queuedTake(input: {
   prompt: string;
   intent: Intent;
   parentId: string | null;
-  kind: TakeKind;
+  kind: GenerationKind;
   label: string;
   free?: boolean;
 }): Take {
@@ -79,7 +79,7 @@ async function runImage(take: Take, onUpdate: EngineUpdate, seed: number): Promi
   onUpdate({ ...copy(take), status: 'generating', progress: 0.3 });
   try {
     const { width, height } = sizeFor(take.intent.kind);
-    const { url } = await postImage({ prompt: promptFor(take.intent, take.kind), width, height, seed });
+    const { url } = await postImage({ prompt: promptFor(take.intent, take.kind === 'render' ? 'render' : 'draft'), width, height, seed });
     onUpdate({ ...copy(take), status: 'ready', progress: 1, assetUrl: url });
   } catch (error) {
     onUpdate({
@@ -181,7 +181,7 @@ export const remoteEngine: GenerationEngine = {
     return batch(source.prompt, source.intent, source.id, 'Variant', onUpdate);
   },
   retry({ failed }, onUpdate) {
-    if (failed.status !== 'failed') throw new Error('Choose a failed take to reroll.');
+    if (failed.status !== 'failed' || failed.kind === 'edit') throw new Error('Choose a failed take to reroll.');
     const take = queuedTake({
       prompt: failed.prompt,
       intent: failed.intent,

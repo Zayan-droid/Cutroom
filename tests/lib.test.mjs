@@ -16,6 +16,7 @@ test('cost.quote mirrors the engine price list', () => {
   assert.equal(quote('render', 'social'), 4);
   assert.equal(quote('render', 'ad'), 6);
   assert.equal(quote('render', 'cinematic'), 8);
+  assert.equal(quote('edit', 'cinematic'), 0);
 });
 
 test('cost.costLabel reads "Free" at zero and spells out credits otherwise', () => {

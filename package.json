@@ -13,9 +13,11 @@
     "test:engine": "node --test tests/engine.test.mjs",
     "test:store": "node --test tests/store.test.mjs",
     "test:story": "node --test tests/story.test.mjs",
+    "test:edit": "node --test tests/edit.test.mjs",
     "typecheck:engine": "tsc --project src/engine/tsconfig.json",
     "typecheck:store": "tsc --project src/store/tsconfig.json",
-    "typecheck:story": "tsc --project src/story/tsconfig.json"
+    "typecheck:story": "tsc --project src/story/tsconfig.json",
+    "typecheck:edit": "tsc --project src/edit/tsconfig.json"
   },
   "dependencies": {
     "framer-motion": "^11.11.17",

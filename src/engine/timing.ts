@@ -1,4 +1,4 @@
-import type { TakeKind } from '../types.ts';
+import type { GenerationKind } from '../types.ts';
 import type { Random } from './random.ts';
 
 export interface ProgressTick {
@@ -12,7 +12,7 @@ export interface JobTiming {
 }
 
 /** Total latency includes the queue. Progress remains below 1 until success. */
-export function planTiming(kind: TakeKind, random: Random, timeScale = 1): JobTiming {
+export function planTiming(kind: GenerationKind, random: Random, timeScale = 1): JobTiming {
   const draft = kind === 'draft';
   const duration = draft
     ? 1000 + Math.floor(random() * 2001)

@@ -1,8 +1,9 @@
 import { createStore } from 'zustand/vanilla';
 import type { EngineUpdate, GenerationEngine } from '../engine/contract.ts';
-import type { Nudge, Take } from '../types.ts';
+import type { EditRecipe, Nudge, Take } from '../types.ts';
 import type { Store } from './contract.ts';
 import { readSession, writeSession, type SessionStorage } from './persist.ts';
+import { hasChanges, normalizeRecipe } from '../edit/recipe.ts';
 
 export const INITIAL_CREDITS = 120;
 
@@ -11,10 +12,17 @@ export interface StoreError {
   message: string;
 }
 
-/** Additive runtime state; the frozen UI contract remains compatible. */
+/** Additive runtime state and actions; the frozen UI contract remains compatible. */
 export interface ProjectStore extends Store {
   reservedCredits: number;
   lastError: StoreError | null;
+  /**
+   * Save an edit of a ready take as a new version branched from it and make it
+   * active. Edits are free and instant: no engine job runs, because the recipe
+   * is applied to the untouched source picture on playback and download.
+   * Returns the new take's id, or null (with `lastError`) if nothing was saved.
+   */
+  applyEdit(id: string, recipe: EditRecipe): string | null;
 }
 
 export interface ProjectStoreOptions {
@@ -23,6 +31,8 @@ export interface ProjectStoreOptions {
 }
 
 const pending = (take: Take) => take.status === 'queued' || take.status === 'generating';
+let editSequence = 0;
+const editId = () => globalThis.crypto?.randomUUID?.() ?? `edit-${Date.now().toString(36)}-${++editSequence}`;
 const copyTake = (take: Take): Take => ({ ...take, intent: { ...take.intent } });
 const nudges: Nudge[] = ['too-fast', 'too-slow', 'wrong-character', 'more-cinematic', 'less-busy'];
 
@@ -156,6 +166,26 @@ export function createProjectStore(engine: GenerationEngine, options: ProjectSto
         const source = sourceFor(id, ['ready', 'failed']);
         // Nudges are exploratory/recovery branches, so they carry no render charge.
         if (source) launch((update) => engine.nudge({ source, nudge }, update), { parentId: id, free: true });
+      },
+      applyEdit(id, recipe) {
+        const source = get().takes.find((take) => take.id === id);
+        if (!source || source.status !== 'ready' || !source.assetUrl || source.assetUrl.startsWith('placeholder://')) {
+          fail('invalid-take', 'Choose a finished take with a picture to edit.'); return null;
+        }
+        const edit = normalizeRecipe(recipe);
+        if (!edit) { fail('invalid-input', 'That edit could not be read. Try again.'); return null; }
+        if (!hasChanges(edit)) { fail('invalid-input', 'Make at least one change before saving an edit.'); return null; }
+        const taken = new Set(get().takes.map((take) => take.id));
+        let newId = editId();
+        while (taken.has(newId)) newId = editId();
+        // An edit of an edit points at the same untouched source picture; its recipe is complete on its own.
+        const take: Take = {
+          id: newId, parentId: source.id, kind: 'edit', status: 'ready', prompt: source.prompt,
+          intent: { ...source.intent }, assetUrl: source.assetUrl, cost: 0, progress: 1, label: 'Edit',
+          edit, createdAt: Date.now(),
+        };
+        set((state) => ({ takes: [...state.takes, take], activeTakeId: take.id, lastError: null }));
+        return take.id;
       },
       reset() { epoch += 1; set({ ...empty(), reservedCredits: 0, lastError: null }); },
     };
