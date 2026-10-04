@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { quote, costLabel } from '../src/lib/cost.ts';
 import { cn } from '../src/lib/cn.ts';
 import { hashId, posterColors, posterStyle, aspectFor, ratioLabel, sceneLayout, mixHex } from '../src/lib/media.ts';
+import { hotkeyName, resolveHotkey } from '../src/lib/hotkeys.ts';
 
 // Part C — UI. The src/lib helpers are pure and were untested. They back the
 // cost chips, poster placeholders, and layout, so pinning them guards the
@@ -78,3 +79,46 @@ test('ratioLabel prints the conventional ratio notation', () => {
   assert.equal(ratioLabel('ad'), '4:5');
   assert.equal(ratioLabel('cinematic'), '16:9');
 });
+
+// Shortcuts. A bare 'r' renders (and spends credits), so a modified press like
+// Ctrl/Cmd+R (refresh) must never fall back to it.
+const press = (key, mods = {}) => ({ key, ctrlKey: false, metaKey: false, altKey: false, shiftKey: false, ...mods });
+const takeKeys = { r: 'render', m: 'remix', n: 'new prompt', escape: 'back', arrowleft: 'prev' };
+
+test('hotkeyName orders modifiers and folds Ctrl and Cmd into mod', () => {
+  assert.equal(hotkeyName(press('r')), 'r');
+  assert.equal(hotkeyName(press('R', { ctrlKey: true, shiftKey: true })), 'mod+shift+r');
+  assert.equal(hotkeyName(press('r', { metaKey: true })), 'mod+r');
+  assert.equal(hotkeyName(press('r', { altKey: true })), 'alt+r');
+  assert.equal(hotkeyName(press('ArrowLeft')), 'arrowleft');
+});
+
+test('browser shortcuts never trigger bare-key actions (Ctrl/Cmd+R refreshes, not renders)', () => {
+  assert.equal(resolveHotkey(press('r', { ctrlKey: true }), takeKeys), undefined);
+  assert.equal(resolveHotkey(press('r', { metaKey: true }), takeKeys), undefined);
+  assert.equal(resolveHotkey(press('R', { ctrlKey: true, shiftKey: true }), takeKeys), undefined);
+  assert.equal(resolveHotkey(press('R', { shiftKey: true }), takeKeys), undefined);
+  assert.equal(resolveHotkey(press('r', { altKey: true }), takeKeys), undefined);
+  assert.equal(resolveHotkey(press('n', { ctrlKey: true }), takeKeys), undefined);
+  assert.equal(resolveHotkey(press('m', { metaKey: true }), takeKeys), undefined);
+});
+
+test('ordinary R, M, N, arrow, and Escape shortcuts still fire', () => {
+  assert.equal(resolveHotkey(press('r'), takeKeys), 'render');
+  assert.equal(resolveHotkey(press('m'), takeKeys), 'remix');
+  assert.equal(resolveHotkey(press('n'), takeKeys), 'new prompt');
+  assert.equal(resolveHotkey(press('ArrowLeft'), takeKeys), 'prev');
+  assert.equal(resolveHotkey(press('Escape'), takeKeys), 'back');
+});
+
+test('while typing, bare keys go to the field; Escape and modifier combos still fire', () => {
+  const keys = { ...takeKeys, 'mod+enter': 'submit' };
+  assert.equal(resolveHotkey(press('r'), keys, true), undefined);
+  assert.equal(resolveHotkey(press('ArrowLeft'), keys, true), undefined);
+  assert.equal(resolveHotkey(press('Escape'), keys, true), 'back');
+  assert.equal(resolveHotkey(press('Enter', { ctrlKey: true }), keys, true), 'submit');
+  assert.equal(resolveHotkey(press('Enter', { metaKey: true }), keys, true), 'submit');
+  assert.equal(resolveHotkey(press('Enter', { ctrlKey: true, altKey: true }), keys, true), undefined);
+  assert.equal(resolveHotkey(press('Enter'), keys, true), undefined);
+});
+
