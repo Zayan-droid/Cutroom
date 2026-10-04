@@ -29,7 +29,7 @@ export function RecoverySurface({ take }: { take: Take }) {
 
       <fieldset className="flex flex-col gap-2">
         <legend className="text-sm font-semibold text-ink">Or reroll with one change</legend>
-        <div className="mt-2 grid grid-cols-2 gap-2">
+        <div className="mt-2 grid grid-cols-[repeat(auto-fill,minmax(7.5rem,1fr))] gap-2">
           {NUDGES.map((n) => (
             <Button
               key={n}

@@ -67,7 +67,7 @@ function wrappedText(ctx: CanvasRenderingContext2D, text: string, width: number)
 
 export function drawStoryFrame(
   ctx: CanvasRenderingContext2D, timeline: StoryTimeline, time: number,
-  options: { images: SceneImages; viseme?: Viseme; captions?: boolean; reducedMotion?: boolean },
+  options: { images: SceneImages; viseme?: Viseme; captions?: boolean; reducedMotion?: boolean; marker?: boolean },
 ) {
   const { scene, dialogue, subtitle } = frameAt(timeline, time);
   ctx.save();
@@ -86,12 +86,14 @@ export function drawStoryFrame(
       ctx.restore();
     } else sceneFrame(ctx, scene, time, options.images, !!options.reducedMotion);
     drawAvatar(ctx, options.viseme ?? 'rest', dialogue?.speaker ?? timeline.dialogue[0]?.speaker ?? 'Narrator');
-    // Scene marker on a solid plate so it reads over any sky.
-    const marker = `Scene ${index + 1} of ${timeline.scenes.length}`;
-    ctx.font = `600 17px ${FRAME_FONT}`;
-    const markerWidth = ctx.measureText(marker).width;
-    ctx.fillStyle = 'rgba(20, 18, 15, 0.78)'; ctx.fillRect(24, 22, markerWidth + 24, 32);
-    ctx.fillStyle = FRAME_PAPER; ctx.fillText(marker, 36, 44);
+    if (options.marker !== false) {
+      // Scene marker on a solid plate so it reads over any sky.
+      const marker = `Scene ${index + 1} of ${timeline.scenes.length}`;
+      ctx.font = `600 17px ${FRAME_FONT}`;
+      const markerWidth = ctx.measureText(marker).width;
+      ctx.fillStyle = 'rgba(20, 18, 15, 0.78)'; ctx.fillRect(24, 22, markerWidth + 24, 32);
+      ctx.fillStyle = FRAME_PAPER; ctx.fillText(marker, 36, 44);
+    }
   }
   if (options.captions && subtitle) {
     ctx.font = `500 25px ${FRAME_FONT}`;
@@ -104,6 +106,25 @@ export function drawStoryFrame(
     lines.forEach((line, index) => ctx.fillText(line, 480, 515 - height + 34 + index * lineHeight));
   }
   ctx.restore();
+}
+
+/**
+ * One small JPEG per scene, drawn by the same renderer as playback, a moment
+ * into the scene (after its transition) so the thumbnail shows what plays.
+ */
+export function sceneThumbnails(timeline: StoryTimeline, images: SceneImages, width = 320): string[] {
+  const height = Math.round((width * FRAME_HEIGHT) / FRAME_WIDTH);
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return [];
+  return timeline.scenes.map((scene) => {
+    ctx.setTransform(width / FRAME_WIDTH, 0, 0, height / FRAME_HEIGHT, 0, 0);
+    const at = scene.startMs + Math.min(scene.durationMs * 0.5, 4000);
+    drawStoryFrame(ctx, timeline, at, { images, captions: false, reducedMotion: true, marker: false });
+    return canvas.toDataURL('image/jpeg', 0.82);
+  });
 }
 
 /** Failures fall back to procedural frames; CORS protects the recording canvas. */

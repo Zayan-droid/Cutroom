@@ -7,11 +7,11 @@ import { costLabel, quote } from '@/lib/cost';
 import { ratioLabel } from '@/lib/media';
 import { INTENT_LABELS, type IntentKind, type Take } from '@/types';
 
-// Bundled demo clips — the same files the offline engine plays back.
-const SAMPLES: Record<IntentKind, string> = {
-  social: new URL('../../assets/social-1-draft.mp4', import.meta.url).href,
-  ad: new URL('../../assets/ad-1-draft.mp4', import.meta.url).href,
-  cinematic: new URL('../../assets/cinematic-1-draft.mp4', import.meta.url).href,
+// Bundled demo clips — the same full-resolution renders the offline engine plays back.
+const SAMPLES: Record<IntentKind, { url: string; scene: string }> = {
+  social: { url: new URL('../../assets/social-1-render.mp4', import.meta.url).href, scene: 'Shoreline from above' },
+  ad: { url: new URL('../../assets/ad-3-render.mp4', import.meta.url).href, scene: 'Watch on marble' },
+  cinematic: { url: new URL('../../assets/cinematic-2-render.mp4', import.meta.url).href, scene: 'Coastline' },
 };
 
 /** Max preview height per format, so a vertical sample never towers over the form. */
@@ -25,11 +25,11 @@ function sampleTake(kind: IntentKind): Take {
   return {
     id: `sample-${kind}`,
     parentId: null,
-    kind: 'draft',
+    kind: 'render',
     status: 'ready',
-    prompt: 'Sample',
+    prompt: SAMPLES[kind].scene,
     intent: { kind, subject: '', style: '', motion: '', mood: '' },
-    assetUrl: SAMPLES[kind],
+    assetUrl: SAMPLES[kind].url,
     cost: 0,
     createdAt: 0,
   };
@@ -50,16 +50,19 @@ export function LandScreen() {
   const sample = useMemo(() => sampleTake(kind), [kind]);
 
   return (
-    <main className="mx-auto max-w-[1400px] px-4 pb-16 pt-8 sm:px-6 lg:pt-12">
+    <main className="mx-auto max-w-[1400px] px-4 pb-16 pt-6 sm:px-6 sm:pt-8 lg:pt-12">
       <motion.header variants={fadeUp} initial="hidden" animate="show" className="max-w-3xl">
         <h1 className="stretch-wide text-[32px] font-bold leading-tight tracking-tight sm:text-[40px]">Start a video</h1>
         <p className="mt-2 text-lg leading-relaxed text-ink-2">
-          Describe a shot and Cutroom generates four drafts for free. Render the one you want — the only
-          step that costs credits — and keep branching from any version.
+          <span className="sm:hidden">Four free drafts first. Pay only for the one you render.</span>
+          <span className="hidden sm:inline">
+            Describe a shot and Cutroom generates four drafts for free. Render the one you want — the only
+            step that costs credits — and keep branching from any version.
+          </span>
         </p>
       </motion.header>
 
-      <div className="mt-8 grid grid-cols-1 items-start gap-8 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-10">
+      <div className="mt-6 grid grid-cols-1 items-start gap-8 sm:mt-8 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-10">
         <motion.section
           variants={fadeUp}
           initial="hidden"
@@ -74,9 +77,9 @@ export function LandScreen() {
           <figure className="flex flex-col gap-2">
             <figcaption className="flex flex-wrap items-baseline justify-between gap-x-3">
               <span id="sample-title" className="text-sm font-semibold text-ink">
-                Sample draft · {INTENT_LABELS[kind]} {ratioLabel(kind)}
+                Sample render · {SAMPLES[kind].scene}, {ratioLabel(kind)}
               </span>
-              <span className="text-[13px] text-ink-3">Bundled demo footage, not your prompt</span>
+              <span className="text-[13px] text-ink-3">Demo footage bundled with Cutroom, not your prompt</span>
             </figcaption>
             <div className={SAMPLE_WIDTH[kind]}>
               <TakeFrame take={sample} variant="stage" />

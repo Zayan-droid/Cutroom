@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useReducedMotion } from 'framer-motion';
 import type { StoryTimeline } from '../../story/types';
-import { posterStyle } from '../../lib/media';
 import { cn } from '../../lib/cn';
 import { Button } from '../components/ui';
 import { Glyph } from '../components/Glyph';
@@ -12,8 +11,10 @@ import { useStoryPlayer } from './useStoryPlayer';
 import { chooseVoice } from './voices';
 import { formatTime, frameAt } from './playback';
 import { drawStoryFrame, FRAME_HEIGHT, FRAME_WIDTH, loadSceneImages, type SceneImages } from './renderFrame';
+import { SceneThumb, useSceneThumbnails } from './SceneThumb';
 import { recordCanvas, recordingType, type CanvasRecording } from './export/recorder';
-import { downloadBlob, subtitlesToVtt } from './export/subtitles';
+import { subtitlesToVtt } from './export/subtitles';
+import { downloadBlob } from '../../lib/download';
 
 const TRANSITION_NAMES: Record<string, string> = { cut: 'cut', fade: 'fade in', slide: 'slide in' };
 
@@ -34,6 +35,7 @@ export function StoryPlayer({ timeline }: { timeline: StoryTimeline }) {
   const exportCanvas = useRef<HTMLCanvasElement | null>(null);
   const canRecord = recordingType() !== null;
   const currentScene = frameAt(timeline, player.time).scene;
+  const thumbs = useSceneThumbnails(timeline, images);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -124,9 +126,8 @@ export function StoryPlayer({ timeline }: { timeline: StoryTimeline }) {
             <button type="button" disabled={recording} onClick={() => player.seek(scene.startMs)}
               aria-label={`Go to scene ${index + 1}, starts at ${formatTime(scene.startMs)}`} aria-current={current ? 'step' : undefined}
               className="group flex w-full flex-col gap-1.5 text-left disabled:cursor-not-allowed disabled:opacity-60">
-              <span aria-hidden className={cn('block aspect-video w-full outline outline-offset-2 transition-[outline-color] duration-150',
-                current ? 'outline-2 outline-mark' : 'outline-1 outline-transparent group-hover:outline-edge')}
-                style={posterStyle(scene.posterSeed)} />
+              <SceneThumb src={thumbs[index]} seed={scene.posterSeed} className={cn('outline outline-offset-2 transition-[outline-color] duration-150',
+                current ? 'outline-2 outline-mark' : 'outline-1 outline-transparent group-hover:outline-edge')} />
               <span className="flex items-baseline justify-between gap-2">
                 <span className={cn('text-[15px]', current ? 'font-semibold text-ink' : 'font-medium text-ink-2')}>Scene {index + 1}</span>
                 <span className="tnum text-[13px] text-ink-3">{formatTime(scene.startMs)}</span>

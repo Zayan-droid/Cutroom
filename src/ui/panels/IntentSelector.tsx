@@ -69,12 +69,13 @@ export function IntentSelector({
                   'hover:bg-ink/[0.05] hover:text-ink',
                   'peer-checked:bg-ink peer-checked:text-paper',
                   'peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-ink',
-                  full ? 'h-full min-h-[60px] px-3 py-2' : 'h-[42px] px-3',
+                  full ? 'h-full min-h-12 px-3 py-2 sm:min-h-[60px]' : 'h-[42px] px-3',
                 )}
               >
                 <FrameShape className={o.shape} />
                 {full ? (
-                  <span className="min-w-0">
+                  // One line on phones, two on wider screens; the price is always shown.
+                  <span className="flex min-w-0 flex-wrap items-baseline gap-x-2 sm:block">
                     <span className="block text-[15px] font-semibold leading-tight">{o.label}</span>
                     <span className="tnum block text-[13px] leading-tight opacity-80">
                       {ratioLabel(o.kind)} · render {price}

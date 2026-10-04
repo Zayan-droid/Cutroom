@@ -65,7 +65,7 @@ function CreditReadout({ mode }: { mode: Mode }) {
 
   return (
     <div className="flex items-baseline gap-1.5" aria-live="polite">
-      <span className="hidden text-sm text-ink-2 sm:inline">{mode === 'takes' ? 'Credits' : 'Story credits'}</span>
+      <span className="text-sm text-ink-2">{mode === 'takes' ? 'Credits' : 'Story credits'}</span>
       <span className="relative inline-block min-w-[2ch] overflow-hidden text-right">
         <AnimatePresence initial={false} mode="popLayout">
           <motion.span
@@ -79,8 +79,11 @@ function CreditReadout({ mode }: { mode: Mode }) {
           </motion.span>
         </AnimatePresence>
       </span>
-      <span className="sr-only sm:hidden">{mode === 'takes' ? 'credits' : 'story credits'}</span>
-      {held > 0 && <span className="tnum text-[13px] font-medium text-warn">({held} held for a render)</span>}
+      {held > 0 && (
+        <span className="tnum text-[13px] font-medium text-warn">
+          ({held} held<span className="hidden sm:inline"> for a render</span>)
+        </span>
+      )}
     </div>
   );
 }

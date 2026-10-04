@@ -14,10 +14,12 @@ const VARIANT: Record<ButtonVariant, string> = {
   danger: 'bg-bad text-sheet enabled:hover:bg-bad/90',
 };
 
+// Heights are minimums: in a narrow column a label wraps and the button grows
+// instead of letting text spill outside it.
 const SIZE: Record<ButtonSize, string> = {
-  sm: 'h-9 px-3 text-sm gap-2',
-  md: 'h-11 px-4 text-[15px] gap-2',
-  lg: 'h-12 px-5 text-base gap-2.5',
+  sm: 'min-h-9 px-3 py-1.5 text-sm gap-x-2 gap-y-0.5',
+  md: 'min-h-11 px-4 py-2 text-[15px] gap-x-2 gap-y-0.5',
+  lg: 'min-h-12 px-5 py-2.5 text-base gap-x-2.5 gap-y-0.5',
   icon: 'h-11 w-11 justify-center',
 };
 
@@ -36,7 +38,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       ref={ref}
       type={type}
       className={cn(
-        'tap inline-flex select-none items-center justify-center rounded font-semibold',
+        'tap inline-flex select-none flex-wrap items-center justify-center rounded text-center font-semibold leading-tight',
         'transition-colors duration-150 ease-out active:translate-y-px',
         'disabled:cursor-not-allowed disabled:active:translate-y-0',
         VARIANT[variant],
@@ -64,13 +66,13 @@ export function Cost({ cost, className }: { cost: number; className?: string }) 
   return <span className={cn('tnum font-medium', className)}>{costLabel(cost)}</span>;
 }
 
-/** Cost appended to a button label: "Render final | 8 credits". */
+/** Cost appended to a button label: "Render final | 8 credits". Wraps as one unit. */
 export function ButtonCost({ cost }: { cost: number }) {
   return (
-    <>
-      <span aria-hidden className="mx-0.5 h-4 w-px bg-current opacity-40" />
+    <span className="inline-flex items-center gap-2 whitespace-nowrap">
+      <span aria-hidden className="h-4 w-px bg-current opacity-40" />
       <span className="tnum font-medium">{costLabel(cost)}</span>
-    </>
+    </span>
   );
 }
 

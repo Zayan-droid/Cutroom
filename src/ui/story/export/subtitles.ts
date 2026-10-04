@@ -14,12 +14,3 @@ export function subtitlesToVtt(cues: readonly SubtitleCue[]): string {
   });
   return `WEBVTT\n\n${blocks.join('\n\n')}\n`;
 }
-
-export function downloadBlob(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url; link.download = filename;
-  document.body.append(link); link.click(); link.remove();
-  // Leave enough time for browsers to consume the download, then release it.
-  setTimeout(() => URL.revokeObjectURL(url), 10_000);
-}

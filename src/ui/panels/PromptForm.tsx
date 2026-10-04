@@ -124,7 +124,7 @@ export function PromptForm({
   // ── Full composer (opening screen) ──────────────────────────────────────────
   return (
     <form
-      className="flex flex-col gap-6"
+      className="flex flex-col gap-5 sm:gap-6"
       onSubmit={(e) => {
         e.preventDefault();
         submit();
@@ -145,22 +145,22 @@ export function PromptForm({
               submit();
             }
           }}
-          rows={4}
-          placeholder="What happens, who is in it, and where. For example: rain on a neon-lit street at night, a cyclist passes, the camera follows."
+          rows={3}
+          placeholder="For example: rain on a neon-lit street at night, a cyclist passes, the camera follows."
           aria-describedby={hintId}
-          className="w-full resize-y rounded border border-edge bg-field p-3.5 font-text text-[19px] leading-relaxed text-ink placeholder:text-ink-3/80 focus:border-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-ink"
+          className="w-full resize-y rounded border border-edge bg-field p-3.5 font-text text-[19px] leading-relaxed text-ink placeholder:text-ink-3/80 focus:border-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-ink sm:min-h-[9.5rem]"
         />
-        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm">
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-sm">
           <span id={examplesId} className="text-ink-2">
             Or start from an example:
           </span>
-          <ul aria-labelledby={examplesId} className="flex flex-wrap gap-x-4 gap-y-1">
+          <ul aria-labelledby={examplesId} className="flex flex-wrap gap-x-4">
             {EXAMPLES.map((e) => (
               <li key={e.title}>
                 <button
                   type="button"
                   onClick={() => applyExample(e)}
-                  className="tap text-left font-medium text-ink underline decoration-edge underline-offset-[3px] transition-colors hover:decoration-ink"
+                  className="py-1.5 text-left font-medium text-ink underline decoration-edge underline-offset-[3px] transition-colors hover:decoration-ink"
                 >
                   {e.title}
                 </button>
@@ -194,7 +194,8 @@ export function PromptForm({
         <PromptAssist id={assistId} open={assistOpen} fields={fields} set={setField} />
       </div>
 
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-3 border-t border-rule pt-5">
+      {/* On phones the action row sticks to the bottom of the screen while the form scrolls. */}
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-rule pt-5 max-sm:sticky max-sm:bottom-0 max-sm:z-20 max-sm:-mx-5 max-sm:-mb-5 max-sm:bg-sheet max-sm:px-5 max-sm:pb-3 max-sm:pt-3">
         <Button type="submit" variant="primary" size="lg" disabled={!canSubmit} aria-describedby={hintId}>
           Generate 4 drafts
           <ButtonCost cost={quote('draft', format)} />

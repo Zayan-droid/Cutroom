@@ -4,6 +4,7 @@ import { quote, costLabel } from '../src/lib/cost.ts';
 import { cn } from '../src/lib/cn.ts';
 import { hashId, posterColors, posterStyle, aspectFor, ratioLabel, sceneLayout, mixHex } from '../src/lib/media.ts';
 import { hotkeyName, resolveHotkey } from '../src/lib/hotkeys.ts';
+import { fileExtension, slugify, takeAsset, takeFileName } from '../src/lib/download.ts';
 
 // Part C — UI. The src/lib helpers are pure and were untested. They back the
 // cost chips, poster placeholders, and layout, so pinning them guards the
@@ -122,3 +123,35 @@ test('while typing, bare keys go to the field; Escape and modifier combos still 
   assert.equal(resolveHotkey(press('Enter'), keys, true), undefined);
 });
 
+// Downloads. Finished takes save with a filename that says what they are.
+test('takeAsset only returns real media for ready takes', () => {
+  assert.equal(takeAsset({ status: 'ready', assetUrl: '/assets/a.mp4' }), '/assets/a.mp4');
+  assert.equal(takeAsset({ status: 'generating', assetUrl: '/assets/a.mp4' }), null);
+  assert.equal(takeAsset({ status: 'ready', assetUrl: 'placeholder://take-1' }), null);
+  assert.equal(takeAsset({ status: 'ready' }), null);
+});
+
+test('fileExtension prefers the response type, then the URL path', () => {
+  assert.equal(fileExtension('/x/clip.webm', 'video/mp4'), 'mp4');
+  assert.equal(fileExtension('/x/still.PNG?v=2#t', ''), 'png');
+  assert.equal(fileExtension('https://cdn.example/a/b', 'image/jpeg; charset=binary'), 'jpg');
+  assert.equal(fileExtension('blob:http://localhost/123'), 'mp4');
+  assert.equal(fileExtension('/no-extension'), 'mp4');
+});
+
+test('slugify makes short ASCII slugs and cuts at a word boundary', () => {
+  assert.equal(slugify('Rain on a neon-lit street, at night!'), 'rain-on-a-neon-lit-street-at-night');
+  assert.equal(slugify('Café crème'), 'cafe-creme');
+  assert.equal(slugify('   '), '');
+  const long = slugify('a lone astronaut drifting slowly past a ringed planet near the edge of the galaxy', 30);
+  assert.ok(long.length <= 30 && !long.endsWith('-'), long);
+});
+
+test('takeFileName names renders and drafts distinctly', () => {
+  assert.equal(
+    takeFileName({ prompt: 'Rain on a neon street', kind: 'render', label: 'Render' }, '/a/r.mp4'),
+    'cutroom-rain-on-a-neon-street-final-render.mp4',
+  );
+  assert.equal(takeFileName({ prompt: 'Rain', kind: 'draft', label: 'Draft 2' }, '/a/d.webm'), 'cutroom-rain-draft-2.webm');
+  assert.equal(takeFileName({ prompt: '!!!', kind: 'draft' }, '/a/d', 'image/png'), 'cutroom-take-draft.png');
+});

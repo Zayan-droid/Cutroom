@@ -1,13 +1,13 @@
 import { useId, useState } from 'react';
 import type { StoryInput } from '../../story/contract';
 import type { StoryStatus, StoryTimeline } from '../../story/types';
-import { posterStyle } from '../../lib/media';
 import { cn } from '../../lib/cn';
 import { Button, ButtonCost } from '../components/ui';
 import { Glyph } from '../components/Glyph';
 import { STORY_FIXTURES } from './fixtures';
 import { LanguagePicker } from './LanguagePicker';
 import { StoryPlayer } from './StoryPlayer';
+import { SceneThumb, useSceneThumbnails } from './SceneThumb';
 
 /** Half 1's store supplies this view model. The UI never calls an engine. */
 export interface StoryBinding {
@@ -157,6 +157,7 @@ function Composing({ timeline, status }: { timeline: StoryTimeline | null; statu
   const pct = Math.round(progress * 100);
   const step = status === 'queued' ? 0 : 1;
   const scenes = timeline?.scenes ?? [];
+  const thumbs = useSceneThumbnails(timeline);
   return (
     <div role="status" aria-live="polite" className="rounded-md border border-rule bg-sheet p-5 sm:p-6">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -196,7 +197,7 @@ function Composing({ timeline, status }: { timeline: StoryTimeline | null; statu
           <ol className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
             {scenes.map((scene, index) => (
               <li key={scene.id} className="flex flex-col gap-1.5">
-                <span aria-hidden className="block aspect-video border border-rule" style={posterStyle(scene.posterSeed)} />
+                <SceneThumb src={thumbs[index]} seed={scene.posterSeed} className="border border-rule" />
                 <span className="text-[13px] text-ink-2">Scene {index + 1}</span>
               </li>
             ))}

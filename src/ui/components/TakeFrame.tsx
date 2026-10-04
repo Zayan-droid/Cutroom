@@ -3,15 +3,10 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { cn } from '@/lib/cn';
 import { aspectFor } from '@/lib/media';
 import { tLayout } from '@/lib/motion';
+import { takeAsset } from '@/lib/download';
 import type { Take } from '@/types';
 import { Button } from './ui';
 import { Glyph } from './Glyph';
-
-/** A real asset from the engine (bundled clip, or a generated image/video URL). */
-function realAsset(take: Take): string | null {
-  const url = take.assetUrl;
-  return take.status === 'ready' && url && !url.startsWith('placeholder://') ? url : null;
-}
 
 /** Remote renders return video clips; remote drafts (and some stills) are images. */
 function isVideoAsset(url: string): boolean {
@@ -39,7 +34,7 @@ interface TakeFrameProps {
  * contents change, so a shared `layoutId` never moves between two elements.
  */
 export function TakeFrame({ take, variant = 'thumb', layoutId, className }: TakeFrameProps) {
-  const asset = realAsset(take);
+  const asset = takeAsset(take);
   const stage = variant === 'stage';
   const playable = stage && asset !== null && isVideoAsset(asset) ? asset : null;
   const player = useClipPlayer(playable);

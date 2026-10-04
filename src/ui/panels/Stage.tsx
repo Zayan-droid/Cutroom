@@ -2,6 +2,7 @@ import { useEffect, useRef, type CSSProperties } from 'react';
 import { motion } from 'framer-motion';
 import { INTENT_LABELS, NUDGE_LABELS, type IntentKind, type Nudge, type Take } from '@/types';
 import { TakeFrame } from '@/ui/components/TakeFrame';
+import { DownloadTake } from '@/ui/components/DownloadTake';
 import { Button, ButtonCost, Status } from '@/ui/components/ui';
 import { Glyph } from '@/ui/components/Glyph';
 import { RecoverySurface } from './RecoverySurface';
@@ -83,9 +84,13 @@ export function Stage({
       </header>
 
       {/* The picture leads. Widescreen takes span the column with actions below;
-          tall formats leave room beside the frame, so actions sit there instead. */}
+          tall formats leave room beside the frame, so actions sit there instead —
+          the actions keep a minimum width and the frame gives way when space is short. */}
       <div
-        className={cn('grid grid-cols-1 items-start gap-6', !wide && 'md:grid-cols-[var(--frame-w)_minmax(0,1fr)] md:gap-8')}
+        className={cn(
+          'grid grid-cols-1 items-start gap-6',
+          !wide && 'md:grid-cols-[minmax(0,var(--frame-w))_minmax(17.5rem,1fr)] md:gap-8',
+        )}
         style={{ '--frame-w': frameWidth(limit) } as CSSProperties}
       >
         <div className="mx-auto w-full max-w-[var(--frame-w)] md:mx-0">
@@ -135,6 +140,16 @@ export function Stage({
                   </div>
                 )}
 
+                {renderReady && (
+                  <DownloadTake
+                    take={take}
+                    label="Download final render"
+                    variant="primary"
+                    size="lg"
+                    className={cn(wide && 'md:w-[22rem]')}
+                  />
+                )}
+
                 <Button
                   variant="secondary"
                   size={wide ? 'lg' : 'md'}
@@ -148,6 +163,10 @@ export function Stage({
                   Remix into 4 drafts
                   <ButtonCost cost={0} />
                 </Button>
+
+                {isDraft && (
+                  <DownloadTake take={take} label="Download draft" variant="quiet" size={wide ? 'lg' : 'md'} className={cn(wide && 'md:w-auto')} />
+                )}
               </div>
             </>
           )}
@@ -158,7 +177,7 @@ export function Stage({
             <fieldset disabled={!ready} className="flex min-w-0 flex-col gap-2 disabled:opacity-60">
               <legend className="text-sm font-semibold text-ink">Adjust and retry</legend>
               <p className="-mt-1 text-sm text-ink-2">Each adjustment makes one new free draft from this take.</p>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-2">
                 {NUDGES.map((n) => (
                   <Button
                     key={n}
